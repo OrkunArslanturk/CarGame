@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -109,6 +109,28 @@ public:
 
 	/** Update */
 	virtual void Tick(float Delta) override;
+
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// UI için Hız Verisi (KM/H)
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Data")
+	float GetCurrentSpeedKMH() const;
+
+	// UI ve Ses için Motor Devri (RPM)
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Data")
+	float GetCurrentRPM() const;
+
+	// UI için Vites
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Data")
+	int32 GetCurrentGear() const;
+
+	// İbreler için Maksimum Devir
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Data")
+	float GetMaxRPM() const;
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 	// End Actor interface
 

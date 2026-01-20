@@ -1,6 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "CarTest2Pawn.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
 #include "CarTest2WheelFront.h"
 #include "CarTest2WheelRear.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -295,5 +296,57 @@ void ACarTest2Pawn::FlippedCheck()
 		bPreviousFlipCheck = false;
 	}
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float ACarTest2Pawn::GetCurrentSpeedKMH() const
+{
+	// Hareket bileşenini güvenli bir şekilde alıyoruz
+	const UChaosWheeledVehicleMovementComponent* VehicleComp = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+
+	if (VehicleComp)
+	{
+		// Hız (cm/s) -> KM/H dönüşümü (Mutlak değer alıyoruz ki geri giderken eksi çıkmasın)
+		return FMath::Abs(VehicleComp->GetForwardSpeed()) * 0.036f;
+	}
+	return 0.0f;
+}
+
+float ACarTest2Pawn::GetCurrentRPM() const
+{
+	const UChaosWheeledVehicleMovementComponent* VehicleComp = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+
+	if (VehicleComp)
+	{
+		return VehicleComp->GetEngineRotationSpeed();
+	}
+	return 0.0f;
+}
+
+int32 ACarTest2Pawn::GetCurrentGear() const
+{
+	const UChaosWheeledVehicleMovementComponent* VehicleComp = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+
+	if (VehicleComp)
+	{
+		return VehicleComp->GetCurrentGear();
+	}
+	return 0;
+}
+
+float ACarTest2Pawn::GetMaxRPM() const
+{
+	const UChaosWheeledVehicleMovementComponent* VehicleComp = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+
+	if (VehicleComp)
+	{
+		return VehicleComp->EngineSetup.MaxRPM;
+	}
+	return 6000.0f;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 #undef LOCTEXT_NAMESPACE
