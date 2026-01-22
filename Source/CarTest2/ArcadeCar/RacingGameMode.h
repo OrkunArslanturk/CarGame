@@ -1,7 +1,3 @@
-﻿// RacingGameMode.h
-// Game mode for arcade racing
-// For AGP Racing Game Assignment - Futuregames 2026
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -11,32 +7,28 @@
 UCLASS()
 class CARTEST2_API ARacingGameMode : public AGameModeBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	ARacingGameMode();
+    ARacingGameMode();
+    virtual void BeginPlay() override;
+    virtual void Tick(float DeltaTime) override;
 
-	virtual void BeginPlay() override;
+    UPROPERTY(BlueprintReadOnly, Category = "Race")
+    bool bRaceActive = false;
 
-	// ==================== RACE STATE ====================
+    UPROPERTY(BlueprintReadOnly, Category = "Race")
+    float RaceTime = 0.f;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Race")
-	bool bRaceStarted = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Race")
+    int32 TotalLaps = 3;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Race")
-	float RaceTime = 0.f;
+    UFUNCTION(BlueprintCallable, Category = "Race")
+    void StartRace();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Race")
-	int32 TotalLaps = 3;
+    UFUNCTION(BlueprintCallable, Category = "Race")
+    void StopRace();
 
-	// ==================== FUNCTIONS ====================
-
-	UFUNCTION(BlueprintCallable, Category = "Race")
-	void StartRace();
-
-	UFUNCTION(BlueprintCallable, Category = "Race")
-	void EndRace();
-
-	UFUNCTION(BlueprintCallable, Category = "Race")
-	FString GetFormattedRaceTime() const;
+    UFUNCTION(BlueprintPure, Category = "Race")
+    FString GetFormattedTime() const;
 };

@@ -1,7 +1,3 @@
-﻿// RacingPlayerController.h
-// Player controller with Enhanced Input System
-// For AGP Racing Game Assignment - Futuregames 2026
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -25,54 +21,31 @@ public:
     virtual void SetupInputComponent() override;
     virtual void OnPossess(APawn* InPawn) override;
 
-    // ==================== ENHANCED INPUT ====================
-
-    // Controller's Input Mapping Context
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (DisplayName = "Controller Input Mapping Context"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputMappingContext* ControllerMappingContext;
 
-    // Input Actions
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (DisplayName = "IA Pause"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* PauseAction;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (DisplayName = "IA Cycle Camera"))
-    UInputAction* CycleCameraAction;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (DisplayName = "IA Respawn"))
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* RespawnAction;
-
-    // ==================== PAUSE ====================
 
     UFUNCTION(BlueprintCallable, Category = "Game")
     void TogglePause();
 
-    UPROPERTY(BlueprintReadOnly, Category = "Game")
-    bool bIsGamePaused = false;
-
-    // ==================== CAMERA ====================
-
-    UFUNCTION(BlueprintCallable, Category = "Camera")
-    void CycleCamera();
-
-    UPROPERTY(BlueprintReadOnly, Category = "Camera")
-    int32 CurrentCameraMode = 0;
-
-    // ==================== RESPAWN ====================
-
     UFUNCTION(BlueprintCallable, Category = "Game")
     void RespawnCar();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Respawn")
-    FTransform RespawnTransform;
-
-    // ==================== REFERENCE ====================
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    bool bIsPaused = false;
 
     UPROPERTY(BlueprintReadOnly, Category = "Reference")
     AArcadeCar* ControlledCar;
 
+    UPROPERTY(BlueprintReadWrite, Category = "Respawn")
+    FTransform RespawnTransform;
+
 protected:
-    // Enhanced Input Handlers
     void HandlePause(const FInputActionValue& Value);
-    void HandleCycleCamera(const FInputActionValue& Value);
     void HandleRespawn(const FInputActionValue& Value);
 };
