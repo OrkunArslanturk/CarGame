@@ -6,31 +6,31 @@ UArcadeWheelFront::UArcadeWheelFront()
     WheelRadius = 35.f;
     WheelWidth = 25.f;
 
-    // Friction
-    FrictionForceMultiplier = 3.f;
-    CorneringStiffness = 1000.f;
+    // === CONTROL TUNING ===
+    // Friction: HIGH to maintain steering while drifting
+    FrictionForceMultiplier = 3.5f; 
+    
+    // Cornering Stiffness: High to bite into the turn instantly
+    CorneringStiffness = 1200.f; 
+    
     SlipThreshold = 20.f;
     SkidThreshold = 20.f;
 
     // Suspension
     SuspensionMaxRaise = 12.f;
     SuspensionMaxDrop = 12.f;
-    SpringRate = 150.f;
+    SpringRate = 160.f;
     SpringPreload = 50.f;
     WheelLoadRatio = 0.5f;
 
-    // Steering - Front wheels CAN steer
+    // Steering
     bAffectedBySteering = true;
-    MaxSteerAngle = 40.f;
+    MaxSteerAngle = 45.f; // Slightly more angle for deep drifts
 
-    // Brakes
+    // Brakes/Drive
     MaxBrakeTorque = 4000.f;
-    MaxHandBrakeTorque = 0.f;  // No handbrake on front
-
-    // Drive - Not driven (RWD car)
+    MaxHandBrakeTorque = 0.f;
     bAffectedByEngine = false;
     bAffectedByHandbrake = false;
-
-    // Physics
     SweepShape = ESweepShape::Raycast;
 }

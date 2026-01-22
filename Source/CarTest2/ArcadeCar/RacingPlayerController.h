@@ -21,6 +21,8 @@ public:
     virtual void SetupInputComponent() override;
     virtual void OnPossess(APawn* InPawn) override;
 
+    // --- Input Configuration ---
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputMappingContext* ControllerMappingContext;
 
@@ -30,11 +32,15 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* RespawnAction;
 
+    // --- Game Commands ---
+
     UFUNCTION(BlueprintCallable, Category = "Game")
     void TogglePause();
 
     UFUNCTION(BlueprintCallable, Category = "Game")
     void RespawnCar();
+
+    // --- State & References ---
 
     UPROPERTY(BlueprintReadOnly, Category = "State")
     bool bIsPaused = false;

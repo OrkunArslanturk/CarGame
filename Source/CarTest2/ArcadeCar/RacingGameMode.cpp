@@ -40,5 +40,6 @@ FString ARacingGameMode::GetFormattedTime() const
     int32 Minutes = FMath::FloorToInt(RaceTime / 60.f);
     int32 Seconds = FMath::FloorToInt(FMath::Fmod(RaceTime, 60.f));
     int32 Millis = FMath::FloorToInt(FMath::Fmod(RaceTime * 1000.f, 1000.f));
+    
     return FString::Printf(TEXT("%02d:%02d.%03d"), Minutes, Seconds, Millis);
 }
