@@ -11,7 +11,7 @@ UArcadeWheelFront::UArcadeWheelFront()
     FrictionForceMultiplier = 3.5f; 
     
     // Cornering Stiffness: High to bite into the turn instantly
-    CorneringStiffness = 1200.f; 
+    CorneringStiffness = 900.f; //1200
     
     SlipThreshold = 20.f;
     SkidThreshold = 20.f;

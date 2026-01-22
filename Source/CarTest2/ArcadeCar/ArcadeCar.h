@@ -90,19 +90,45 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float MaxSteerAngle = 40.f;
 
-    // --- Configuration: Stability (Anti-Spin) ---
+    // --- Configuration: Drive Assist ---
 
-    // Angle in degrees where stability control kicks in (stops 180 spins)
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "45.0", ClampMax = "120.0"))
-    float MaxDriftAngle = 70.f;
+    // Master toggle for all assist systems
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drive Assist")
+    bool bEnableDriveAssist = true;
 
-    // Normal resistance to rotation
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability")
-    float BaseAngularDamping = 2.0f;
+    // How strongly to straighten velocity toward forward direction (0-1)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drive Assist", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float VelocityStraightenStrength = 0.6f;
 
-    // Extra resistance applied when exceeding MaxDriftAngle
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability")
-    float StabilityCorrection = 10.0f;
+    // Speed at which drive assist fully kicks in (km/h)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drive Assist", meta = (ClampMin = "5.0"))
+    float AssistMinSpeed = 15.f;
+
+    // Counter-steer assist strength when car starts rotating wrong way
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drive Assist", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float CounterSteerAssist = 0.5f;
+
+    // --- Configuration: Drift Assist (Anti-Spin) ---
+
+    // Maximum allowed drift angle before hard correction kicks in
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift Assist", meta = (ClampMin = "30.0", ClampMax = "90.0"))
+    float MaxDriftAngle = 25.f;
+
+    // Soft limit - assist starts ramping up here
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift Assist", meta = (ClampMin = "15.0", ClampMax = "60.0"))
+    float DriftAssistStartAngle = 35.f;
+
+    // How aggressively to kill angular velocity when drifting (deg/s reduction per frame)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift Assist", meta = (ClampMin = "0.0"))
+    float AngularVelocityDamping = 5.0f;
+
+    // Extra damping multiplier when exceeding MaxDriftAngle (emergency stop)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift Assist", meta = (ClampMin = "1.0"))
+    float EmergencyDampingMultiplier = 4.0f;
+
+    // Velocity correction strength when over max angle (pulls car straight)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift Assist", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+    float OverAngleVelocityCorrection = 0.8f;
 
     // --- Configuration: Camera ---
 
@@ -146,6 +172,14 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "State")
     bool bIsHandbraking = false;
 
+    // Debug: Current slip angle in degrees
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    float CurrentSlipAngle = 0.f;
+
+    // Debug: Which direction we're drifting (-1 = left, 0 = straight, 1 = right)
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    float DriftDirection = 0.f;
+
     UFUNCTION(BlueprintCallable, Category = "Vehicle")
     void RefreshSettings();
 
@@ -158,6 +192,11 @@ protected:
     void UpdateWheelPositions();
     void UpdateWheelVisuals();
     void ShowDebugInfo();
+
+    // New assist functions
+    void ApplyDriveAssist(float DeltaTime);
+    void ApplyDriftAssist(float DeltaTime);
+    float CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwardDir) const;
 
 private:
     float ThrottleInput = 0.f;

@@ -14,8 +14,6 @@ AArcadeCar::AArcadeCar()
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetMesh());
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    // Base stability
-    BodyMesh->SetAngularDamping(BaseAngularDamping);
 
     // --- Wheel Meshes ---
     Wheel_FL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FL"));
@@ -133,37 +131,11 @@ void AArcadeCar::Tick(float DeltaTime)
         CurrentRPM = Vehicle->GetEngineRotationSpeed();
         CurrentGear = Vehicle->GetCurrentGear();
 
-        // --- DRIFT STABILITY LOGIC (Prevents 180 spins) ---
-        if (FMath::Abs(SpeedKMH) > 10.f)
+        // Apply assist systems
+        if (bEnableDriveAssist)
         {
-            FVector Velocity = GetVelocity();
-            FVector Forward = GetActorForwardVector();
-            
-            // Ignore vertical movement
-            Velocity.Z = 0.f;
-            Forward.Z = 0.f;
-            Velocity.Normalize();
-            Forward.Normalize();
-
-            // Calculate Angle
-            float Dot = FVector::DotProduct(Forward, Velocity);
-            float SlipAngle = FMath::Acos(Dot) * (180.f / UE_DOUBLE_PI);
-
-            // Apply dynamic damping
-            float TargetDamping = BaseAngularDamping;
-
-            if (SlipAngle > MaxDriftAngle)
-            {
-                // Ramp up damping to stop the spin
-                float OverLimitFactor = (SlipAngle - MaxDriftAngle) / 20.f; 
-                TargetDamping = BaseAngularDamping + (StabilityCorrection * OverLimitFactor);
-            }
-
-            BodyMesh->SetAngularDamping(TargetDamping);
-        }
-        else
-        {
-            BodyMesh->SetAngularDamping(BaseAngularDamping);
+            ApplyDriveAssist(DeltaTime);
+            ApplyDriftAssist(DeltaTime);
         }
     }
 
@@ -171,11 +143,223 @@ void AArcadeCar::Tick(float DeltaTime)
     ShowDebugInfo();
 }
 
+float AArcadeCar::CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwardDir) const
+{
+    FVector Velocity = GetVelocity();
+    FVector Forward = GetActorForwardVector();
+    
+    // Flatten to 2D
+    Velocity.Z = 0.f;
+    Forward.Z = 0.f;
+    
+    float Speed = Velocity.Size();
+    if (Speed < 1.f)
+    {
+        OutVelocityDir = Forward;
+        OutForwardDir = Forward;
+        return 0.f;
+    }
+    
+    OutVelocityDir = Velocity / Speed;
+    OutForwardDir = Forward.GetSafeNormal();
+    
+    // Calculate signed angle
+    float Dot = FVector::DotProduct(OutForwardDir, OutVelocityDir);
+    Dot = FMath::Clamp(Dot, -1.f, 1.f);
+    float AngleRad = FMath::Acos(Dot);
+    float AngleDeg = FMath::RadiansToDegrees(AngleRad);
+    
+    // Determine sign (positive = drifting right, negative = drifting left)
+    FVector Cross = FVector::CrossProduct(OutForwardDir, OutVelocityDir);
+    if (Cross.Z < 0.f)
+    {
+        AngleDeg = -AngleDeg;
+    }
+    
+    return AngleDeg;
+}
+
+void AArcadeCar::ApplyDriveAssist(float DeltaTime)
+{
+    float AbsSpeed = FMath::Abs(SpeedKMH);
+    if (AbsSpeed < AssistMinSpeed)
+    {
+        return;
+    }
+    
+    FVector VelocityDir, ForwardDir;
+    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
+    float AbsSlipAngle = FMath::Abs(SlipAngle);
+    
+    // Skip if already pretty straight
+    if (AbsSlipAngle < 5.f)
+    {
+        return;
+    }
+    
+    // Only apply light straightening when not in a heavy drift
+    if (AbsSlipAngle < DriftAssistStartAngle && !bIsHandbraking)
+    {
+        UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+        if (!PhysicsRoot) return;
+        
+        FVector CurrentVelocity = GetVelocity();
+        float Speed = CurrentVelocity.Size();
+        
+        // Determine target direction based on movement (forward or backward)
+        FVector TargetDir = ForwardDir;
+        if (SpeedKMH < 0.f)
+        {
+            TargetDir = -ForwardDir;
+        }
+        
+        // Blend velocity toward target direction
+        float SpeedFactor = FMath::Clamp((AbsSpeed - AssistMinSpeed) / 30.f, 0.f, 1.f);
+        float AngleFactor = AbsSlipAngle / DriftAssistStartAngle;
+        float BlendAmount = VelocityStraightenStrength * SpeedFactor * AngleFactor * DeltaTime * 5.f;
+        
+        FVector NewVelocityDir = FMath::Lerp(VelocityDir, TargetDir, BlendAmount).GetSafeNormal();
+        FVector NewVelocity = NewVelocityDir * Speed;
+        NewVelocity.Z = CurrentVelocity.Z; // Preserve vertical velocity
+        
+        PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
+    }
+}
+
+void AArcadeCar::ApplyDriftAssist(float DeltaTime)
+{
+    float AbsSpeed = FMath::Abs(SpeedKMH);
+    if (AbsSpeed < AssistMinSpeed)
+    {
+        CurrentSlipAngle = 0.f;
+        DriftDirection = 0.f;
+        return;
+    }
+    
+    UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+    if (!PhysicsRoot) return;
+    
+    FVector VelocityDir, ForwardDir;
+    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
+    float AbsSlipAngle = FMath::Abs(SlipAngle);
+    
+    // Update debug state
+    CurrentSlipAngle = AbsSlipAngle;
+    DriftDirection = FMath::Sign(SlipAngle);
+    
+    // No assist needed if angle is small
+    if (AbsSlipAngle < DriftAssistStartAngle)
+    {
+        return;
+    }
+    
+    // Get current angular velocity (yaw rate)
+    FVector AngularVelocity = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
+    float YawRate = AngularVelocity.Z;
+    
+    // Determine if the car is spinning further away from the velocity direction
+    // (i.e., the spin is making the drift worse)
+    bool bSpinningWorse = false;
+    if (SlipAngle > 0.f && YawRate > 0.f) // Drifting right, spinning right = worse
+    {
+        bSpinningWorse = true;
+    }
+    else if (SlipAngle < 0.f && YawRate < 0.f) // Drifting left, spinning left = worse
+    {
+        bSpinningWorse = true;
+    }
+    
+    // Calculate assist intensity based on how far over the threshold we are
+    float OverThreshold = (AbsSlipAngle - DriftAssistStartAngle) / (MaxDriftAngle - DriftAssistStartAngle);
+    OverThreshold = FMath::Clamp(OverThreshold, 0.f, 1.f);
+    
+    // Check if we're over the hard limit (emergency mode)
+    bool bEmergency = AbsSlipAngle > MaxDriftAngle;
+    
+    // --- 1. Angular Velocity Damping ---
+    // Always damp if spinning the wrong way, or if over angle threshold
+    if (bSpinningWorse || bEmergency)
+    {
+        float DampingStrength = AngularVelocityDamping;
+        
+        if (bEmergency)
+        {
+            // Emergency: much stronger damping
+            DampingStrength *= EmergencyDampingMultiplier;
+        }
+        else
+        {
+            // Scale damping by how far over threshold
+            DampingStrength *= (0.5f + OverThreshold * 0.5f);
+        }
+        
+        // Apply damping to yaw
+        float DampedYaw = YawRate;
+        if (FMath::Abs(YawRate) > 1.f)
+        {
+            float Reduction = DampingStrength * DeltaTime * 60.f; // Scale to ~60fps equivalent
+            DampedYaw = FMath::FInterpTo(YawRate, 0.f, DeltaTime, Reduction);
+        }
+        
+        AngularVelocity.Z = DampedYaw;
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+    }
+    
+    // --- 2. Counter-Steer Assist ---
+    // If player is steering into the drift (trying to recover), help them
+    bool bPlayerCounterSteering = false;
+    if (SlipAngle > 10.f && SteerInput > 0.1f)  // Drifting right, steering right
+    {
+        bPlayerCounterSteering = true;
+    }
+    else if (SlipAngle < -10.f && SteerInput < -0.1f)  // Drifting left, steering left
+    {
+        bPlayerCounterSteering = true;
+    }
+    
+    if (bPlayerCounterSteering && CounterSteerAssist > 0.f)
+    {
+        // Add extra counter-rotation torque
+        float CounterTorque = -FMath::Sign(SlipAngle) * CounterSteerAssist * OverThreshold * 50.f;
+        AngularVelocity.Z += CounterTorque * DeltaTime;
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+    }
+    
+    // --- 3. Emergency Velocity Correction ---
+    // When over max angle, actively pull velocity toward forward direction
+    if (bEmergency && OverAngleVelocityCorrection > 0.f)
+    {
+        FVector CurrentVelocity = GetVelocity();
+        float Speed = CurrentVelocity.Size();
+        
+        if (Speed > 100.f) // Only if moving with reasonable speed
+        {
+            // Calculate how much over the limit we are
+            float EmergencyFactor = (AbsSlipAngle - MaxDriftAngle) / 30.f;
+            EmergencyFactor = FMath::Clamp(EmergencyFactor, 0.f, 1.f);
+            
+            // Determine target direction
+            FVector TargetDir = ForwardDir;
+            if (SpeedKMH < 0.f)
+            {
+                TargetDir = -ForwardDir;
+            }
+            
+            // Aggressively blend toward forward direction
+            float BlendAmount = OverAngleVelocityCorrection * EmergencyFactor * DeltaTime * 8.f;
+            FVector NewVelocityDir = FMath::Lerp(VelocityDir, TargetDir, BlendAmount).GetSafeNormal();
+            FVector NewVelocity = NewVelocityDir * Speed;
+            NewVelocity.Z = CurrentVelocity.Z;
+            
+            PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
+        }
+    }
+}
+
 #if WITH_EDITOR
 void AArcadeCar::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
-    // Simple refresh for any property change
     RefreshSettings();
 }
 #endif
@@ -192,10 +376,10 @@ void AArcadeCar::RefreshSettings()
         CameraArm->CameraRotationLagSpeed = CameraLag;
     }
     
-    // Update Damping Base
-    if (BodyMesh)
+    // Ensure DriftAssistStartAngle < MaxDriftAngle
+    if (DriftAssistStartAngle >= MaxDriftAngle)
     {
-        BodyMesh->SetAngularDamping(BaseAngularDamping);
+        DriftAssistStartAngle = MaxDriftAngle - 10.f;
     }
 }
 
@@ -340,10 +524,26 @@ void AArcadeCar::ShowDebugInfo()
 
     FString GearStr = (CurrentGear == -1) ? TEXT("R") : (CurrentGear == 0) ? TEXT("N") : FString::FromInt(CurrentGear);
     FColor StatusColor = bIsHandbraking ? FColor::Red : FColor::White;
+    
+    // Slip angle color coding
+    FColor SlipColor = FColor::Green;
+    if (CurrentSlipAngle > MaxDriftAngle)
+    {
+        SlipColor = FColor::Red;
+    }
+    else if (CurrentSlipAngle > DriftAssistStartAngle)
+    {
+        SlipColor = FColor::Yellow;
+    }
+    
+    FString DriftDirStr = (DriftDirection > 0.f) ? TEXT("RIGHT") : (DriftDirection < 0.f) ? TEXT("LEFT") : TEXT("STRAIGHT");
 
     GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::White, TEXT("=== ARCADE CAR ==="));
     GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Green, FString::Printf(TEXT("Speed: %.0f km/h"), FMath::Abs(SpeedKMH)));
     GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Yellow, FString::Printf(TEXT("RPM: %.0f | Gear: %s"), CurrentRPM, *GearStr));
     GEngine->AddOnScreenDebugMessage(3, 0.f, FColor::Cyan, FString::Printf(TEXT("Throttle: %.2f | Steer: %.2f"), ThrottleInput, SteerInput));
     GEngine->AddOnScreenDebugMessage(4, 0.f, StatusColor, FString::Printf(TEXT("Handbrake: %s"), bIsHandbraking ? TEXT("ON") : TEXT("OFF")));
+    GEngine->AddOnScreenDebugMessage(5, 0.f, SlipColor, FString::Printf(TEXT("Slip Angle: %.1f° | Drift: %s"), CurrentSlipAngle, *DriftDirStr));
+    GEngine->AddOnScreenDebugMessage(6, 0.f, FColor::White, FString::Printf(TEXT("Assist: %s | Limits: %.0f°-%.0f°"), 
+        bEnableDriveAssist ? TEXT("ON") : TEXT("OFF"), DriftAssistStartAngle, MaxDriftAngle));
 }
