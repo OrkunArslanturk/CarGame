@@ -10,12 +10,12 @@
 
 AArcadeCar::AArcadeCar()
 {
-    // --- Body Mesh ---
+    // Body mesh (attach car model here)
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetMesh());
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // --- Wheel Meshes ---
+    // Wheel meshes (visual only, physics handled by Chaos)
     Wheel_FL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FL"));
     Wheel_FL->SetupAttachment(GetMesh());
     Wheel_FL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -25,7 +25,7 @@ AArcadeCar::AArcadeCar()
     Wheel_FR->SetupAttachment(GetMesh());
     Wheel_FR->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Wheel_FR->SetRelativeLocation(WheelPos_FR);
-    Wheel_FR->SetRelativeScale3D(FVector(1.f, -1.f, 1.f));
+    Wheel_FR->SetRelativeScale3D(FVector(1.f, -1.f, 1.f)); // Mirror for right side
 
     Wheel_RL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_RL"));
     Wheel_RL->SetupAttachment(GetMesh());
@@ -38,7 +38,7 @@ AArcadeCar::AArcadeCar()
     Wheel_RR->SetRelativeLocation(WheelPos_RR);
     Wheel_RR->SetRelativeScale3D(FVector(1.f, -1.f, 1.f));
 
-    // --- Camera ---
+    // Camera setup with lag for smooth follow
     CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
     CameraArm->TargetArmLength = CameraDistance;
@@ -55,17 +55,18 @@ AArcadeCar::AArcadeCar()
     Camera->SetupAttachment(CameraArm);
     Camera->SetFieldOfView(BaseFOV);
 
-    // --- Vehicle Physics ---
+    // Chaos Vehicle setup
     UChaosWheeledVehicleMovementComponent* Vehicle = 
         CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 
+    // Chassis
     Vehicle->Mass = 1500.f;
     Vehicle->ChassisHeight = 140.f;
     Vehicle->DragCoefficient = 0.4f;
-    Vehicle->CenterOfMassOverride = FVector(0.f, 0.f, -45.f); 
+    Vehicle->CenterOfMassOverride = FVector(0.f, 0.f, -45.f); // Lower for stability
     Vehicle->bEnableCenterOfMassOverride = true;
 
-    // Wheel Setup
+    // Wheel configuration
     Vehicle->bLegacyWheelFrictionPosition = false;
     Vehicle->WheelSetups.SetNum(4);
 
@@ -81,7 +82,7 @@ AArcadeCar::AArcadeCar()
     Vehicle->WheelSetups[3].WheelClass = UArcadeWheelRear::StaticClass();
     Vehicle->WheelSetups[3].AdditionalOffset = WheelPos_RR;
 
-    // Engine & Transmission
+    // Engine
     Vehicle->EngineSetup.MaxTorque = EnginePower;
     Vehicle->EngineSetup.MaxRPM = MaxRPM;
     Vehicle->EngineSetup.EngineIdleRPM = 1000.f;
@@ -89,6 +90,7 @@ AArcadeCar::AArcadeCar()
     Vehicle->EngineSetup.EngineRevUpMOI = 2.f;
     Vehicle->EngineSetup.EngineRevDownRate = 1000.f;
 
+    // Transmission
     Vehicle->TransmissionSetup.bUseAutomaticGears = true;
     Vehicle->TransmissionSetup.bUseAutoReverse = true;
     Vehicle->TransmissionSetup.FinalRatio = 3.5f;
@@ -96,11 +98,11 @@ AArcadeCar::AArcadeCar()
     Vehicle->TransmissionSetup.ChangeDownRPM = 2000.f;
     Vehicle->TransmissionSetup.GearChangeTime = 0.2f;
 
+    // RWD setup
     Vehicle->DifferentialSetup.DifferentialType = EVehicleDifferential::RearWheelDrive;
     Vehicle->SteeringSetup.SteeringType = ESteeringType::AngleRatio;
     Vehicle->SteeringSetup.AngleRatio = 1.f;
 
-    // Store base engine torque for nitro calculations
     BaseEngineTorque = EnginePower;
 }
 
@@ -113,13 +115,13 @@ void AArcadeCar::BeginPlay()
     CurrentNitro = FMath::Clamp(StartingNitroAmount, 0.f, MaxNitroAmount);
     CurrentFOV = BaseFOV;
 
-    // Store base engine torque
     if (UChaosWheeledVehicleMovementComponent* Vehicle = 
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
     {
         BaseEngineTorque = Vehicle->EngineSetup.MaxTorque;
     }
 
+    // Setup input mapping context
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -142,27 +144,35 @@ void AArcadeCar::Tick(float DeltaTime)
 
     if (Vehicle)
     {
-        SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
+        // Update state
+        SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f; // cm/s to km/h
         CurrentRPM = Vehicle->GetEngineRotationSpeed();
         CurrentGear = Vehicle->GetCurrentGear();
 
-        // Check ground contact for air control
         CheckGroundContact();
+        UpdateDynamicGrip();
 
-        // Apply arcade physics enhancements
+        // Drift mode: active when handbraking at speed
+        if (bIsHandbraking && FMath::Abs(SpeedKMH) > 15.f)
+        {
+            if (bEnableDriftAssist)
+            {
+                ApplyDriftPhysics(DeltaTime);
+            }
+        }
+        // Normal driving: stability control
+        else if (bEnableStabilityControl)
+        {
+            ApplyStabilityControl(DeltaTime);
+            TimeDrifting = 0.f;
+            DriftAngleMomentum = FMath::FInterpTo(DriftAngleMomentum, 0.f, DeltaTime, 3.f);
+        }
+
         if (bEnableArcadePhysics)
         {
             ApplyArcadePhysics(DeltaTime);
         }
 
-        // Apply assist systems
-        if (bEnableDriveAssist)
-        {
-            ApplyDriveAssist(DeltaTime);
-            ApplyDriftAssist(DeltaTime);
-        }
-
-        // Update nitro system
         if (bEnableNitro)
         {
             UpdateNitro(DeltaTime);
@@ -179,10 +189,8 @@ void AArcadeCar::Tick(float DeltaTime)
 
 void AArcadeCar::ApplyArcadePhysics(float DeltaTime)
 {
-    // Smooth throttle input for better feel
     SmoothedThrottleInput = FMath::FInterpTo(SmoothedThrottleInput, ThrottleInput, DeltaTime, ThrottleResponseRate);
 
-    // Apply different systems
     ApplySpeedSensitiveSteering();
     ApplyDownforce(DeltaTime);
 
@@ -191,24 +199,16 @@ void AArcadeCar::ApplyArcadePhysics(float DeltaTime)
         ApplyAirControl(DeltaTime);
     }
 
-    // Apply launch boost for faster acceleration from standstill
+    // Launch boost: extra acceleration from standstill
     if (FMath::Abs(SpeedKMH) < LaunchBoostMaxSpeed && ThrottleInput > 0.5f && !bIsAirborne)
     {
-        UChaosWheeledVehicleMovementComponent* Vehicle = 
-            Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
-        
-        if (Vehicle)
+        UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+        if (PhysicsRoot)
         {
             float SpeedRatio = FMath::Abs(SpeedKMH) / LaunchBoostMaxSpeed;
             float BoostFactor = FMath::Lerp(LaunchBoostMultiplier, 1.f, SpeedRatio);
-            
-            // Apply extra forward force
-            UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
-            if (PhysicsRoot)
-            {
-                FVector BoostForce = GetActorForwardVector() * (BoostFactor - 1.f) * 15000.f * ThrottleInput;
-                PhysicsRoot->AddForce(BoostForce);
-            }
+            FVector BoostForce = GetActorForwardVector() * (BoostFactor - 1.f) * 15000.f * ThrottleInput;
+            PhysicsRoot->AddForce(BoostForce);
         }
     }
 }
@@ -218,25 +218,27 @@ void AArcadeCar::ApplySpeedSensitiveSteering()
     if (SpeedSteeringFactor <= 0.f) return;
 
     float AbsSpeed = FMath::Abs(SpeedKMH);
-    
-    // Calculate steering multiplier based on speed
     float SteeringMultiplier = 1.f;
+    
+    // Reduce steering at high speed for stability
     if (AbsSpeed > SteeringReductionStartSpeed)
     {
-        // Gradually reduce steering at higher speeds
         float SpeedFactor = (AbsSpeed - SteeringReductionStartSpeed) / 100.f;
         SpeedFactor = FMath::Clamp(SpeedFactor, 0.f, 1.f);
         SteeringMultiplier = FMath::Lerp(1.f, MinSpeedSteeringMultiplier, SpeedFactor * SpeedSteeringFactor);
     }
 
-    // Apply modified steering
     UChaosWheeledVehicleMovementComponent* Vehicle = 
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
     
     if (Vehicle)
     {
         float ModifiedSteer = SteerInput * SteeringMultiplier;
-        Vehicle->SetSteeringInput(ModifiedSteer);
+        if (bIsDrifting)
+        {
+            ModifiedSteer *= DriftSteeringMultiplier;
+        }
+        Vehicle->SetSteeringInput(FMath::Clamp(ModifiedSteer, -1.f, 1.f));
     }
 }
 
@@ -250,13 +252,10 @@ void AArcadeCar::ApplyDownforce(float DeltaTime)
     UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
     if (!PhysicsRoot) return;
 
-    // Quadratic downforce based on speed
+    // Quadratic downforce for realistic feel
     float SpeedOver = AbsSpeed - DownforceStartSpeed;
     float DownforceAmount = DownforceCoefficient * SpeedOver * SpeedOver * 0.5f;
-    
-    // Apply downward force
-    FVector DownforceVector = FVector(0.f, 0.f, -DownforceAmount);
-    PhysicsRoot->AddForce(DownforceVector);
+    PhysicsRoot->AddForce(FVector(0.f, 0.f, -DownforceAmount));
 }
 
 void AArcadeCar::ApplyAirControl(float DeltaTime)
@@ -268,13 +267,9 @@ void AArcadeCar::ApplyAirControl(float DeltaTime)
 
     FVector AngularVelocity = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
     
-    // Allow yaw control with steering input
-    float YawControl = SteerInput * AirControlStrength * 180.f * DeltaTime;
-    AngularVelocity.Z += YawControl;
-    
-    // Allow pitch control with throttle input
-    float PitchControl = SmoothedThrottleInput * AirControlStrength * 60.f * DeltaTime;
-    AngularVelocity.Y -= PitchControl;
+    // Yaw with steering, pitch with throttle
+    AngularVelocity.Z += SteerInput * AirControlStrength * 180.f * DeltaTime;
+    AngularVelocity.Y -= SmoothedThrottleInput * AirControlStrength * 60.f * DeltaTime;
     
     PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
 }
@@ -291,14 +286,14 @@ void AArcadeCar::CheckGroundContact()
     {
         if (UChaosVehicleWheel* Wheel = Vehicle->Wheels[i])
         {
-            if (Wheel->IsInAir() == false)
+            if (!Wheel->IsInAir())
             {
                 WheelsOnGround++;
             }
         }
     }
-
-    // Consider airborne if fewer than 2 wheels touching ground
+    
+    // Airborne if fewer than 2 wheels on ground
     bIsAirborne = WheelsOnGround < 2;
 }
 
@@ -308,10 +303,8 @@ void AArcadeCar::CheckGroundContact()
 
 void AArcadeCar::UpdateNitro(float DeltaTime)
 {
-    // Determine if nitro should be active
     bool bWantsNitro = bNitroInputHeld && CanActivateNitro();
     
-    // Update active state with small hysteresis to prevent flickering
     if (bWantsNitro && !bIsNitroActive)
     {
         bIsNitroActive = true;
@@ -326,31 +319,23 @@ void AArcadeCar::UpdateNitro(float DeltaTime)
         // Drain nitro
         CurrentNitro -= NitroDrainRate * DeltaTime;
         CurrentNitro = FMath::Max(CurrentNitro, 0.f);
-        
-        // Apply boost
         ApplyNitroBoost(DeltaTime);
-        
-        // Smooth intensity up
         NitroIntensity = FMath::FInterpTo(NitroIntensity, 1.f, DeltaTime, 10.f);
     }
     else
     {
-        // Regenerate nitro when not boosting
+        // Regenerate nitro (bonus while drifting)
         float RegenAmount = NitroRegenRate;
-        
-        // Bonus regen while drifting
-        if (CurrentSlipAngle > 15.f && !bIsAirborne)
+        if (bIsDrifting && CurrentSlipAngle > 15.f)
         {
             RegenAmount += NitroDriftRegenBonus;
         }
         
         CurrentNitro += RegenAmount * DeltaTime;
         CurrentNitro = FMath::Min(CurrentNitro, MaxNitroAmount);
-        
-        // Smooth intensity down
         NitroIntensity = FMath::FInterpTo(NitroIntensity, 0.f, DeltaTime, 6.f);
         
-        // Reset engine torque when not boosting
+        // Reset torque when not boosting
         UChaosWheeledVehicleMovementComponent* Vehicle = 
             Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
         if (Vehicle)
@@ -359,10 +344,7 @@ void AArcadeCar::UpdateNitro(float DeltaTime)
         }
     }
 
-    // Update normalized percent for UI
     NitroPercent = (MaxNitroAmount > 0.f) ? (CurrentNitro / MaxNitroAmount) : 0.f;
-
-    // Update visual effects
     UpdateNitroVisuals(DeltaTime);
 }
 
@@ -373,7 +355,7 @@ void AArcadeCar::ApplyNitroBoost(float DeltaTime)
     
     if (!Vehicle) return;
 
-    // Increase engine torque
+    // Boost engine torque
     Vehicle->EngineSetup.MaxTorque = BaseEngineTorque * NitroTorqueMultiplier;
 
     // Apply direct forward force
@@ -382,13 +364,12 @@ void AArcadeCar::ApplyNitroBoost(float DeltaTime)
         UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
         if (PhysicsRoot)
         {
-            // Check speed cap
+            // Reduce force near speed cap
             float AbsSpeed = FMath::Abs(SpeedKMH);
             float SpeedCapFactor = 1.f;
             
             if (NitroMaxSpeed > 0.f && AbsSpeed > NitroMaxSpeed * 0.9f)
             {
-                // Reduce force as we approach speed cap
                 SpeedCapFactor = FMath::Max(0.f, 1.f - ((AbsSpeed - NitroMaxSpeed * 0.9f) / (NitroMaxSpeed * 0.1f)));
             }
             
@@ -400,13 +381,8 @@ void AArcadeCar::ApplyNitroBoost(float DeltaTime)
 
 void AArcadeCar::UpdateNitroVisuals(float DeltaTime)
 {
-    // Update FOV based on nitro state
-    float TargetFOV = BaseFOV;
-    if (bIsNitroActive)
-    {
-        TargetFOV = BaseFOV + NitroFOVIncrease;
-    }
-    
+    // FOV increase during boost
+    float TargetFOV = bIsNitroActive ? (BaseFOV + NitroFOVIncrease) : BaseFOV;
     CurrentFOV = FMath::FInterpTo(CurrentFOV, TargetFOV, DeltaTime, NitroFOVLerpSpeed);
     
     if (Camera)
@@ -431,14 +407,270 @@ void AArcadeCar::RefillNitro()
 }
 
 // =============================================================================
-// DRIVE ASSIST SYSTEMS
+// GRIP SYSTEM
 // =============================================================================
+
+void AArcadeCar::UpdateDynamicGrip()
+{
+    UChaosWheeledVehicleMovementComponent* Vehicle = 
+        Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    
+    if (!Vehicle) return;
+
+    // Rear wheels: low grip for drift, high grip for stability
+    for (int32 i = 2; i < Vehicle->Wheels.Num(); i++)
+    {
+        if (UChaosVehicleWheel* Wheel = Vehicle->Wheels[i])
+        {
+            if (bIsHandbraking)
+            {
+                Wheel->FrictionForceMultiplier = TireGrip * DriftRearGripMultiplier;
+            }
+            else if (bEnableStabilityControl)
+            {
+                Wheel->FrictionForceMultiplier = TireGrip * StabilityGripMultiplier;
+            }
+            else
+            {
+                Wheel->FrictionForceMultiplier = TireGrip;
+            }
+        }
+    }
+    
+    // Front wheels: high grip for steering control
+    for (int32 i = 0; i < 2 && i < Vehicle->Wheels.Num(); i++)
+    {
+        if (UChaosVehicleWheel* Wheel = Vehicle->Wheels[i])
+        {
+            if (bIsHandbraking)
+            {
+                Wheel->FrictionForceMultiplier = TireGrip * DriftFrontGripMultiplier;
+            }
+            else if (bEnableStabilityControl)
+            {
+                Wheel->FrictionForceMultiplier = TireGrip * StabilityGripMultiplier * 1.2f;
+            }
+            else
+            {
+                Wheel->FrictionForceMultiplier = TireGrip;
+            }
+        }
+    }
+}
+
+// =============================================================================
+// STABILITY CONTROL (Normal Driving)
+// =============================================================================
+
+void AArcadeCar::ApplyStabilityControl(float DeltaTime)
+{
+    float AbsSpeed = FMath::Abs(SpeedKMH);
+    
+    FVector VelocityDir, ForwardDir;
+    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
+    float AbsSlipAngle = FMath::Abs(SlipAngle);
+    
+    CurrentSlipAngle = AbsSlipAngle;
+    DriftDirection = FMath::Sign(SlipAngle);
+    bIsDrifting = false;
+    DriftIntensity = 0.f;
+    
+    // Reduce stability at low speed for maneuverability
+    float SpeedFactor = FMath::Clamp((AbsSpeed - 5.f) / (StabilityMinSpeed - 5.f), 0.f, 1.f);
+    if (SpeedFactor <= 0.f || bIsAirborne) return;
+
+    UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+    if (!PhysicsRoot) return;
+
+    FVector AngularVelocity = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
+    float YawRate = AngularVelocity.Z;
+    float AbsYawRate = FMath::Abs(YawRate);
+
+    // Limit yaw rate to prevent spin-outs
+    if (AbsYawRate > MaxYawRateWithoutHandbrake)
+    {
+        float ClampedYaw = FMath::Sign(YawRate) * MaxYawRateWithoutHandbrake;
+        AngularVelocity.Z = FMath::Lerp(YawRate, ClampedYaw, YawDampingStrength * SpeedFactor);
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+    }
+    
+    // Dampen yaw when not steering
+    if (FMath::Abs(SteerInput) < 0.3f && AbsYawRate > 20.f)
+    {
+        AngularVelocity.Z = FMath::FInterpTo(YawRate, 0.f, DeltaTime, YawDampingStrength * SpeedFactor * 10.f);
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+    }
+
+    // Align velocity with forward direction
+    if (AbsSlipAngle > StabilitySlipThreshold)
+    {
+        FVector CurrentVelocity = GetVelocity();
+        float Speed = CurrentVelocity.Size();
+        
+        if (Speed > 100.f)
+        {
+            FVector TargetDir = (SpeedKMH < 0.f) ? -ForwardDir : ForwardDir;
+            float OverThreshold = FMath::Clamp((AbsSlipAngle - StabilitySlipThreshold) / 20.f, 0.f, 1.f);
+            float BlendAmount = StabilityStrength * SpeedFactor * OverThreshold * DeltaTime * 15.f;
+            
+            FVector NewVelocityDir = FMath::Lerp(VelocityDir, TargetDir, BlendAmount).GetSafeNormal();
+            FVector NewVelocity = NewVelocityDir * Speed;
+            NewVelocity.Z = CurrentVelocity.Z;
+            PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
+        }
+    }
+
+    // Counter-rotate when spinning away from velocity
+    bool bRotatingAway = (SlipAngle > 2.f && YawRate > 5.f) || (SlipAngle < -2.f && YawRate < -5.f);
+    if (bRotatingAway)
+    {
+        float CounterTorque = -FMath::Sign(YawRate) * StabilityStrength * SpeedFactor * 100.f * DeltaTime;
+        AngularVelocity.Z += CounterTorque;
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+    }
+}
+
+// =============================================================================
+// DRIFT PHYSICS
+// =============================================================================
+
+void AArcadeCar::ApplyDriftPhysics(float DeltaTime)
+{
+    float AbsSpeed = FMath::Abs(SpeedKMH);
+    
+    FVector VelocityDir, ForwardDir;
+    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
+    float AbsSlipAngle = FMath::Abs(SlipAngle);
+    
+    CurrentSlipAngle = AbsSlipAngle;
+    DriftDirection = FMath::Sign(SlipAngle);
+    
+    bIsDrifting = AbsSlipAngle > 10.f;
+    DriftIntensity = FMath::Clamp(AbsSlipAngle / OptimalDriftAngle, 0.f, 1.5f);
+    
+    if (bIsDrifting)
+    {
+        TimeDrifting += DeltaTime;
+    }
+
+    UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+    if (!PhysicsRoot) return;
+
+    FVector AngularVelocity = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
+    float YawRate = AngularVelocity.Z;
+
+    // Throttle controls drift angle: gas = wider, brake = tighter
+    float TargetDriftAngle = OptimalDriftAngle;
+    if (ThrottleInput > 0.1f)
+    {
+        float ThrottleEffect = ThrottleInput * ThrottleDriftControl;
+        TargetDriftAngle = FMath::Lerp(OptimalDriftAngle * 0.7f, MaxDriftAngle * 0.8f, ThrottleEffect);
+    }
+    else if (ThrottleInput < -0.1f)
+    {
+        TargetDriftAngle = OptimalDriftAngle * 0.5f;
+    }
+
+    // Steering adjusts drift angle
+    float SteerEffect = SteerInput * DriftDirection;
+    if (SteerEffect > 0.1f)
+    {
+        TargetDriftAngle *= (1.f + SteerEffect * 0.3f);
+    }
+    else if (SteerEffect < -0.1f)
+    {
+        TargetDriftAngle *= (1.f + SteerEffect * 0.5f);
+    }
+
+    TargetDriftAngle = FMath::Clamp(TargetDriftAngle, 15.f, MaxDriftAngle);
+
+    // Smooth drift angle changes
+    float AngleDiff = TargetDriftAngle - AbsSlipAngle;
+    DriftAngleMomentum = FMath::FInterpTo(DriftAngleMomentum, AngleDiff, DeltaTime, DriftResponsiveness);
+
+    float DesiredYawChange = DriftAngleMomentum * DriftDirection * DeltaTime * 60.f;
+    
+    // Counter-steer assistance
+    bool bCounterSteering = (DriftDirection > 0.f && SteerInput > 0.2f) || 
+                            (DriftDirection < 0.f && SteerInput < -0.2f);
+    
+    if (bCounterSteering)
+    {
+        float CounterStrength = FMath::Abs(SteerInput) * 40.f * DeltaTime;
+        DesiredYawChange -= DriftDirection * CounterStrength;
+    }
+
+    // Anti-spin protection
+    float MaxYawRate = 120.f;
+    if (AbsSlipAngle > MaxDriftAngle * 0.9f)
+    {
+        MaxYawRate = 60.f;
+        
+        // Emergency correction when over limit
+        if (AbsSlipAngle > MaxDriftAngle)
+        {
+            float EmergencyDamp = FMath::Clamp((AbsSlipAngle - MaxDriftAngle) / 20.f, 0.f, 1.f);
+            DesiredYawChange *= (1.f - EmergencyDamp * 0.8f);
+            
+            // Pull velocity toward forward
+            FVector CurrentVelocity = GetVelocity();
+            float Speed = CurrentVelocity.Size();
+            if (Speed > 100.f)
+            {
+                float BlendAmount = EmergencyDamp * DeltaTime * 10.f;
+                FVector NewVelocityDir = FMath::Lerp(VelocityDir, ForwardDir, BlendAmount).GetSafeNormal();
+                FVector NewVelocity = NewVelocityDir * Speed;
+                NewVelocity.Z = CurrentVelocity.Z;
+                PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
+            }
+        }
+    }
+
+    float NewYawRate = FMath::Clamp(YawRate + DesiredYawChange, -MaxYawRate, MaxYawRate);
+    
+    // Dampen if spinning makes drift worse
+    bool bSpinningWorse = (SlipAngle > 0.f && YawRate > 10.f) || (SlipAngle < 0.f && YawRate < -10.f);
+    if (bSpinningWorse && AbsSlipAngle > OptimalDriftAngle)
+    {
+        float DampFactor = FMath::Clamp((AbsSlipAngle - OptimalDriftAngle) / 30.f, 0.f, 0.8f);
+        NewYawRate = FMath::Lerp(NewYawRate, 0.f, DampFactor * DeltaTime * 5.f);
+    }
+
+    AngularVelocity.Z = NewYawRate;
+    PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
+
+    // Drift momentum: maintain forward speed while sliding
+    FVector CurrentVelocity = GetVelocity();
+    float Speed = CurrentVelocity.Size();
+    
+    if (Speed > 100.f && ThrottleInput > 0.f)
+    {
+        float MomentumFactor = DriftMomentumRetention * ThrottleInput;
+        FVector TargetDir = FMath::Lerp(VelocityDir, ForwardDir, MomentumFactor * DeltaTime * 3.f).GetSafeNormal();
+        FVector NewVelocity = TargetDir * Speed;
+        NewVelocity.Z = CurrentVelocity.Z;
+        PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
+    }
+
+    // Drift boost: reward for maintaining optimal angle
+    if (bIsDrifting && DriftBoostForce > 0.f && ThrottleInput > 0.3f)
+    {
+        float DriftQuality = 1.f - FMath::Abs(AbsSlipAngle - OptimalDriftAngle) / OptimalDriftAngle;
+        DriftQuality = FMath::Clamp(DriftQuality, 0.f, 1.f);
+        
+        float TimeBonus = FMath::Clamp(TimeDrifting / 2.f, 0.f, 1.f);
+        float BoostAmount = DriftBoostForce * DriftQuality * TimeBonus * ThrottleInput * DeltaTime;
+        
+        PhysicsRoot->AddForce(ForwardDir * BoostAmount);
+    }
+}
 
 float AArcadeCar::CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwardDir) const
 {
     FVector Velocity = GetVelocity();
     FVector Forward = GetActorForwardVector();
     
+    // Flatten to 2D
     Velocity.Z = 0.f;
     Forward.Z = 0.f;
     
@@ -453,175 +685,12 @@ float AArcadeCar::CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwar
     OutVelocityDir = Velocity / Speed;
     OutForwardDir = Forward.GetSafeNormal();
     
-    float Dot = FVector::DotProduct(OutForwardDir, OutVelocityDir);
-    Dot = FMath::Clamp(Dot, -1.f, 1.f);
-    float AngleRad = FMath::Acos(Dot);
-    float AngleDeg = FMath::RadiansToDegrees(AngleRad);
+    float Dot = FMath::Clamp(FVector::DotProduct(OutForwardDir, OutVelocityDir), -1.f, 1.f);
+    float AngleDeg = FMath::RadiansToDegrees(FMath::Acos(Dot));
     
+    // Sign: positive = drifting right, negative = left
     FVector Cross = FVector::CrossProduct(OutForwardDir, OutVelocityDir);
-    if (Cross.Z < 0.f)
-    {
-        AngleDeg = -AngleDeg;
-    }
-    
-    return AngleDeg;
-}
-
-void AArcadeCar::ApplyDriveAssist(float DeltaTime)
-{
-    float AbsSpeed = FMath::Abs(SpeedKMH);
-    if (AbsSpeed < AssistMinSpeed)
-    {
-        return;
-    }
-    
-    FVector VelocityDir, ForwardDir;
-    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
-    float AbsSlipAngle = FMath::Abs(SlipAngle);
-    
-    if (AbsSlipAngle < 5.f)
-    {
-        return;
-    }
-    
-    // Only apply light straightening when not in a heavy drift
-    if (AbsSlipAngle < DriftAssistStartAngle && !bIsHandbraking)
-    {
-        UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
-        if (!PhysicsRoot) return;
-        
-        FVector CurrentVelocity = GetVelocity();
-        float Speed = CurrentVelocity.Size();
-        
-        FVector TargetDir = ForwardDir;
-        if (SpeedKMH < 0.f)
-        {
-            TargetDir = -ForwardDir;
-        }
-        
-        float SpeedFactor = FMath::Clamp((AbsSpeed - AssistMinSpeed) / 30.f, 0.f, 1.f);
-        float AngleFactor = AbsSlipAngle / DriftAssistStartAngle;
-        float BlendAmount = VelocityStraightenStrength * SpeedFactor * AngleFactor * DeltaTime * 5.f;
-        
-        FVector NewVelocityDir = FMath::Lerp(VelocityDir, TargetDir, BlendAmount).GetSafeNormal();
-        FVector NewVelocity = NewVelocityDir * Speed;
-        NewVelocity.Z = CurrentVelocity.Z;
-        
-        PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
-    }
-}
-
-void AArcadeCar::ApplyDriftAssist(float DeltaTime)
-{
-    float AbsSpeed = FMath::Abs(SpeedKMH);
-    if (AbsSpeed < AssistMinSpeed)
-    {
-        CurrentSlipAngle = 0.f;
-        DriftDirection = 0.f;
-        return;
-    }
-    
-    UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
-    if (!PhysicsRoot) return;
-    
-    FVector VelocityDir, ForwardDir;
-    float SlipAngle = CalculateSlipAngle(VelocityDir, ForwardDir);
-    float AbsSlipAngle = FMath::Abs(SlipAngle);
-    
-    CurrentSlipAngle = AbsSlipAngle;
-    DriftDirection = FMath::Sign(SlipAngle);
-    
-    if (AbsSlipAngle < DriftAssistStartAngle)
-    {
-        return;
-    }
-    
-    FVector AngularVelocity = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
-    float YawRate = AngularVelocity.Z;
-    
-    bool bSpinningWorse = false;
-    if (SlipAngle > 0.f && YawRate > 0.f)
-    {
-        bSpinningWorse = true;
-    }
-    else if (SlipAngle < 0.f && YawRate < 0.f)
-    {
-        bSpinningWorse = true;
-    }
-    
-    float OverThreshold = (AbsSlipAngle - DriftAssistStartAngle) / (MaxDriftAngle - DriftAssistStartAngle);
-    OverThreshold = FMath::Clamp(OverThreshold, 0.f, 1.f);
-    
-    bool bEmergency = AbsSlipAngle > MaxDriftAngle;
-    
-    // Angular Velocity Damping
-    if (bSpinningWorse || bEmergency)
-    {
-        float DampingStrength = AngularVelocityDamping;
-        
-        if (bEmergency)
-        {
-            DampingStrength *= EmergencyDampingMultiplier;
-        }
-        else
-        {
-            DampingStrength *= (0.5f + OverThreshold * 0.5f);
-        }
-        
-        float DampedYaw = YawRate;
-        if (FMath::Abs(YawRate) > 1.f)
-        {
-            float Reduction = DampingStrength * DeltaTime * 60.f;
-            DampedYaw = FMath::FInterpTo(YawRate, 0.f, DeltaTime, Reduction);
-        }
-        
-        AngularVelocity.Z = DampedYaw;
-        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
-    }
-    
-    // Counter-Steer Assist
-    bool bPlayerCounterSteering = false;
-    if (SlipAngle > 10.f && SteerInput > 0.1f)
-    {
-        bPlayerCounterSteering = true;
-    }
-    else if (SlipAngle < -10.f && SteerInput < -0.1f)
-    {
-        bPlayerCounterSteering = true;
-    }
-    
-    if (bPlayerCounterSteering && CounterSteerAssist > 0.f)
-    {
-        float CounterTorque = -FMath::Sign(SlipAngle) * CounterSteerAssist * OverThreshold * 50.f;
-        AngularVelocity.Z += CounterTorque * DeltaTime;
-        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(AngularVelocity);
-    }
-    
-    // Emergency Velocity Correction
-    if (bEmergency && OverAngleVelocityCorrection > 0.f)
-    {
-        FVector CurrentVelocity = GetVelocity();
-        float Speed = CurrentVelocity.Size();
-        
-        if (Speed > 100.f)
-        {
-            float EmergencyFactor = (AbsSlipAngle - MaxDriftAngle) / 30.f;
-            EmergencyFactor = FMath::Clamp(EmergencyFactor, 0.f, 1.f);
-            
-            FVector TargetDir = ForwardDir;
-            if (SpeedKMH < 0.f)
-            {
-                TargetDir = -ForwardDir;
-            }
-            
-            float BlendAmount = OverAngleVelocityCorrection * EmergencyFactor * DeltaTime * 8.f;
-            FVector NewVelocityDir = FMath::Lerp(VelocityDir, TargetDir, BlendAmount).GetSafeNormal();
-            FVector NewVelocity = NewVelocityDir * Speed;
-            NewVelocity.Z = CurrentVelocity.Z;
-            
-            PhysicsRoot->SetPhysicsLinearVelocity(NewVelocity);
-        }
-    }
+    return (Cross.Z < 0.f) ? -AngleDeg : AngleDeg;
 }
 
 // =============================================================================
@@ -638,6 +707,11 @@ void AArcadeCar::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
         {
             Input->BindAction(Input_Throttle, ETriggerEvent::Triggered, this, &AArcadeCar::OnThrottle);
             Input->BindAction(Input_Throttle, ETriggerEvent::Completed, this, &AArcadeCar::OnThrottle);
+        }
+        if (Input_Brake)
+        {
+            Input->BindAction(Input_Brake, ETriggerEvent::Triggered, this, &AArcadeCar::OnBrake);
+            Input->BindAction(Input_Brake, ETriggerEvent::Completed, this, &AArcadeCar::OnBrake);
         }
         if (Input_Steer)
         {
@@ -660,18 +734,76 @@ void AArcadeCar::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
 void AArcadeCar::OnThrottle(const FInputActionValue& Value)
 {
     ThrottleInput = Value.Get<float>();
-    UChaosWheeledVehicleMovementComponent* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
-    if (Vehicle)
+    
+    UChaosWheeledVehicleMovementComponent* Vehicle = 
+        Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    
+    if (!Vehicle) return;
+
+    // W key: forward acceleration only
+    if (ThrottleInput > 0.f)
     {
-        if (ThrottleInput >= 0.f)
+        bWantsToReverse = false;
+        Vehicle->SetThrottleInput(ThrottleInput);
+        
+        // Only clear brake if not pressing brake key
+        if (BrakeInput <= 0.f)
         {
-            Vehicle->SetThrottleInput(ThrottleInput);
             Vehicle->SetBrakeInput(0.f);
         }
-        else
+    }
+    else
+    {
+        // No throttle input
+        if (BrakeInput <= 0.f)
         {
             Vehicle->SetThrottleInput(0.f);
-            Vehicle->SetBrakeInput(FMath::Abs(ThrottleInput));
+        }
+    }
+}
+
+void AArcadeCar::OnBrake(const FInputActionValue& Value)
+{
+    BrakeInput = Value.Get<float>();
+    
+    UChaosWheeledVehicleMovementComponent* Vehicle = 
+        Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    
+    if (!Vehicle) return;
+
+    // S key: brake when moving forward, reverse when stopped
+    if (BrakeInput > 0.f)
+    {
+        // Going forward: brake
+        if (SpeedKMH > ReverseThresholdSpeed)
+        {
+            bWantsToReverse = false;
+            Vehicle->SetThrottleInput(0.f);
+            Vehicle->SetBrakeInput(BrakeInput);
+        }
+        // Stopped or nearly stopped: engage reverse
+        else if (SpeedKMH < ReverseThresholdSpeed && SpeedKMH > -ReverseThresholdSpeed)
+        {
+            bWantsToReverse = true;
+            Vehicle->SetBrakeInput(0.f);
+            Vehicle->SetThrottleInput(-BrakeInput);
+        }
+        // Already reversing: continue reverse
+        else
+        {
+            bWantsToReverse = true;
+            Vehicle->SetBrakeInput(0.f);
+            Vehicle->SetThrottleInput(-BrakeInput);
+        }
+    }
+    else
+    {
+        // No brake input
+        bWantsToReverse = false;
+        if (ThrottleInput <= 0.f)
+        {
+            Vehicle->SetBrakeInput(0.f);
+            Vehicle->SetThrottleInput(0.f);
         }
     }
 }
@@ -680,21 +812,22 @@ void AArcadeCar::OnSteer(const FInputActionValue& Value)
 {
     SteerInput = Value.Get<float>();
     
-    // If arcade physics is disabled, apply steering directly
+    // Direct steering when arcade physics disabled
     if (!bEnableArcadePhysics)
     {
-        if (UChaosWheeledVehicleMovementComponent* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
+        if (UChaosWheeledVehicleMovementComponent* Vehicle = 
+            Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
         {
             Vehicle->SetSteeringInput(SteerInput);
         }
     }
-    // Otherwise, ApplySpeedSensitiveSteering() handles it in Tick
 }
 
 void AArcadeCar::OnHandbrakeStart(const FInputActionValue& Value)
 {
     bIsHandbraking = true;
-    if (UChaosWheeledVehicleMovementComponent* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
+    if (UChaosWheeledVehicleMovementComponent* Vehicle = 
+        Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
     {
         Vehicle->SetHandbrakeInput(true);
     }
@@ -703,7 +836,8 @@ void AArcadeCar::OnHandbrakeStart(const FInputActionValue& Value)
 void AArcadeCar::OnHandbrakeEnd(const FInputActionValue& Value)
 {
     bIsHandbraking = false;
-    if (UChaosWheeledVehicleMovementComponent* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
+    if (UChaosWheeledVehicleMovementComponent* Vehicle = 
+        Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
     {
         Vehicle->SetHandbrakeInput(false);
     }
@@ -720,7 +854,7 @@ void AArcadeCar::OnNitroEnd(const FInputActionValue& Value)
 }
 
 // =============================================================================
-// CONFIGURATION & VISUALS
+// CONFIGURATION
 // =============================================================================
 
 #if WITH_EDITOR
@@ -748,18 +882,13 @@ void AArcadeCar::RefreshSettings()
         Camera->SetFieldOfView(BaseFOV);
         CurrentFOV = BaseFOV;
     }
-    
-    if (DriftAssistStartAngle >= MaxDriftAngle)
-    {
-        DriftAssistStartAngle = MaxDriftAngle - 10.f;
-    }
 
-    // Update base engine torque reference
     BaseEngineTorque = EnginePower;
 }
 
 void AArcadeCar::UpdateWheelPositions()
 {
+    // Update visual positions
     if (Wheel_FL) Wheel_FL->SetRelativeLocation(WheelPos_FL);
     if (Wheel_FR) Wheel_FR->SetRelativeLocation(WheelPos_FR);
     if (Wheel_RL) Wheel_RL->SetRelativeLocation(WheelPos_RL);
@@ -770,6 +899,7 @@ void AArcadeCar::UpdateWheelPositions()
     
     if (!Vehicle) return;
 
+    // Update physics wheel offsets
     if (Vehicle->WheelSetups.Num() >= 4)
     {
         Vehicle->WheelSetups[0].AdditionalOffset = WheelPos_FL;
@@ -781,6 +911,7 @@ void AArcadeCar::UpdateWheelPositions()
     Vehicle->EngineSetup.MaxTorque = EnginePower;
     Vehicle->EngineSetup.MaxRPM = MaxRPM;
 
+    // Apply tuning to all wheels
     for (int32 i = 0; i < Vehicle->Wheels.Num(); i++)
     {
         UChaosVehicleWheel* Wheel = Vehicle->Wheels[i];
@@ -793,9 +924,14 @@ void AArcadeCar::UpdateWheelPositions()
         Wheel->SuspensionMaxDrop = SuspensionTravel;
         Wheel->SpringRate = SuspensionStiffness;
 
+        // Front wheels steer
         if (i < 2) Wheel->MaxSteerAngle = MaxSteerAngle;
     }
 }
+
+// =============================================================================
+// VISUALS
+// =============================================================================
 
 void AArcadeCar::UpdateWheelVisuals()
 {
@@ -811,10 +947,12 @@ void AArcadeCar::UpdateWheelVisuals()
     {
         if (UChaosVehicleWheel* PhysWheel = Vehicle->Wheels[i])
         {
+            // Position with suspension offset
             FVector NewPos = BasePositions[i];
             NewPos.Z += PhysWheel->GetSuspensionOffset();
             WheelMeshes[i]->SetRelativeLocation(NewPos);
 
+            // Rotation (spin + steer for front wheels)
             FRotator NewRot = FRotator(PhysWheel->GetRotationAngle(), i < 2 ? PhysWheel->GetSteerAngle() : 0.f, 0.f);
             WheelMeshes[i]->SetRelativeRotation(NewRot);
         }
@@ -826,41 +964,34 @@ void AArcadeCar::ShowDebugInfo()
     if (!bShowDebug || !GEngine) return;
 
     FString GearStr = (CurrentGear == -1) ? TEXT("R") : (CurrentGear == 0) ? TEXT("N") : FString::FromInt(CurrentGear);
-    FColor StatusColor = bIsHandbraking ? FColor::Red : FColor::White;
     
-    FColor SlipColor = FColor::Green;
-    if (CurrentSlipAngle > MaxDriftAngle)
+    // Color based on drift quality
+    FColor DriftColor = FColor::Green;
+    if (bIsDrifting)
     {
-        SlipColor = FColor::Red;
-    }
-    else if (CurrentSlipAngle > DriftAssistStartAngle)
-    {
-        SlipColor = FColor::Yellow;
+        float AngleRatio = CurrentSlipAngle / OptimalDriftAngle;
+        if (AngleRatio > 1.3f) DriftColor = FColor::Red;
+        else if (AngleRatio > 0.7f) DriftColor = FColor::Orange;
+        else DriftColor = FColor::Yellow;
     }
     
-    FString DriftDirStr = (DriftDirection > 0.f) ? TEXT("RIGHT") : (DriftDirection < 0.f) ? TEXT("LEFT") : TEXT("STRAIGHT");
-    FString AirborneStr = bIsAirborne ? TEXT("AIRBORNE") : TEXT("GROUNDED");
-    FColor AirColor = bIsAirborne ? FColor::Cyan : FColor::Green;
+    FString ModeStr = bIsHandbraking ? TEXT("DRIFT") : TEXT("GRIP");
+    FColor ModeColor = bIsHandbraking ? FColor::Orange : FColor::Green;
+    FString DriftDirStr = (DriftDirection > 0.f) ? TEXT("R") : (DriftDirection < 0.f) ? TEXT("L") : TEXT("-");
 
-    // Nitro bar visualization
-    int32 NitroBarLength = 20;
-    int32 FilledSegments = FMath::RoundToInt(NitroPercent * NitroBarLength);
+    // Nitro bar
+    int32 NitroBarLen = 20;
+    int32 Filled = FMath::RoundToInt(NitroPercent * NitroBarLen);
     FString NitroBar = TEXT("[");
-    for (int32 i = 0; i < NitroBarLength; i++)
-    {
-        NitroBar += (i < FilledSegments) ? TEXT("|") : TEXT(" ");
-    }
+    for (int32 i = 0; i < NitroBarLen; i++) NitroBar += (i < Filled) ? TEXT("|") : TEXT(" ");
     NitroBar += TEXT("]");
     FColor NitroColor = bIsNitroActive ? FColor::Orange : (NitroPercent > 0.3f ? FColor::Yellow : FColor::Red);
 
     GEngine->AddOnScreenDebugMessage(0, 0.f, FColor::White, TEXT("=== ARCADE CAR ==="));
-    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Green, FString::Printf(TEXT("Speed: %.0f km/h"), FMath::Abs(SpeedKMH)));
-    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Yellow, FString::Printf(TEXT("RPM: %.0f | Gear: %s"), CurrentRPM, *GearStr));
-    GEngine->AddOnScreenDebugMessage(3, 0.f, FColor::Cyan, FString::Printf(TEXT("Throttle: %.2f | Steer: %.2f"), ThrottleInput, SteerInput));
-    GEngine->AddOnScreenDebugMessage(4, 0.f, StatusColor, FString::Printf(TEXT("Handbrake: %s"), bIsHandbraking ? TEXT("ON") : TEXT("OFF")));
-    GEngine->AddOnScreenDebugMessage(5, 0.f, SlipColor, FString::Printf(TEXT("Slip Angle: %.1f° | Drift: %s"), CurrentSlipAngle, *DriftDirStr));
-    GEngine->AddOnScreenDebugMessage(6, 0.f, AirColor, FString::Printf(TEXT("Ground: %d wheels | %s"), WheelsOnGround, *AirborneStr));
-    GEngine->AddOnScreenDebugMessage(7, 0.f, NitroColor, FString::Printf(TEXT("NITRO: %s %.0f%% %s"), *NitroBar, NitroPercent * 100.f, bIsNitroActive ? TEXT(">>> BOOST! <<<") : TEXT("")));
-    GEngine->AddOnScreenDebugMessage(8, 0.f, FColor::White, FString::Printf(TEXT("Assist: %s | Arcade: %s"), 
-        bEnableDriveAssist ? TEXT("ON") : TEXT("OFF"), bEnableArcadePhysics ? TEXT("ON") : TEXT("OFF")));
+    GEngine->AddOnScreenDebugMessage(1, 0.f, FColor::Green, FString::Printf(TEXT("Speed: %.0f km/h | Gear: %s"), FMath::Abs(SpeedKMH), *GearStr));
+    GEngine->AddOnScreenDebugMessage(2, 0.f, FColor::Cyan, FString::Printf(TEXT("Throttle: %.2f | Brake: %.2f | Steer: %.2f"), ThrottleInput, BrakeInput, SteerInput));
+    GEngine->AddOnScreenDebugMessage(3, 0.f, ModeColor, FString::Printf(TEXT("Mode: %s | Reverse: %s | Handbrake: %s"), *ModeStr, bWantsToReverse ? TEXT("Y") : TEXT("N"), bIsHandbraking ? TEXT("ON") : TEXT("OFF")));
+    GEngine->AddOnScreenDebugMessage(4, 0.f, DriftColor, FString::Printf(TEXT("Slip: %.1f° [%s] | Optimal: %.0f°"), CurrentSlipAngle, *DriftDirStr, OptimalDriftAngle));
+    GEngine->AddOnScreenDebugMessage(5, 0.f, bIsDrifting ? FColor::Yellow : FColor::White, FString::Printf(TEXT("Drifting: %s | Time: %.1fs"), bIsDrifting ? TEXT("YES") : TEXT("NO"), TimeDrifting));
+    GEngine->AddOnScreenDebugMessage(6, 0.f, NitroColor, FString::Printf(TEXT("NITRO %s %.0f%% %s"), *NitroBar, NitroPercent * 100.f, bIsNitroActive ? TEXT("BOOST!") : TEXT("")));
 }
