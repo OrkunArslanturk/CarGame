@@ -50,7 +50,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UCameraComponent* Camera;
 
-    // --- Wheel Positions (relative to root) ---
+    // --- Wheel Positions ---
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Positions")
     FVector WheelPos_FL = FVector(140.f, -85.f, 0.f);
@@ -90,16 +90,31 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float MaxSteerAngle = 40.f;
 
-    // Speed threshold for brake-to-reverse transition (km/h)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning", meta = (ClampMin = "1.0", ClampMax = "20.0"))
     float ReverseThresholdSpeed = 5.f;
 
-    // --- Arcade Physics ---
+    // --- Arcade Physics (Imphenzia Style) ---
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade")
     bool bEnableArcadePhysics = true;
 
-    // Reduces steering sensitivity at high speed
+    // How fast the car rotates when holding steer (Degrees per second)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Torque")
+    float MaxYawRotationSpeed = 120.f;
+
+    // How strongly the car resists sliding sideways (High = Grip, Low = Ice)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Friction")
+    float DriftSideFriction = 4.0f;
+
+    // Normal driving side friction (keeps car straight)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Friction")
+    float NormalSideFriction = 10.0f;
+
+    // How quickly rotation stops when you release steering (Prevents spinning out)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Torque")
+    float AngularDamping = 10.0f;
+
+    // --- Legacy Arcade Settings (Optional Use) ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0", ClampMax = "1.0"))
     float SpeedSteeringFactor = 0.7f;
 
@@ -109,21 +124,18 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "20.0"))
     float SteeringReductionStartSpeed = 60.f;
 
-    // Adds downward force at high speed for grip
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0"))
     float DownforceCoefficient = 0.5f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "50.0"))
     float DownforceStartSpeed = 80.f;
 
-    // Allows rotation control while airborne
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0", ClampMax = "1.0"))
     float AirControlStrength = 0.4f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "1.0", ClampMax = "20.0"))
     float ThrottleResponseRate = 8.f;
 
-    // Extra acceleration from standstill
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "1.0", ClampMax = "3.0"))
     float LaunchBoostMultiplier = 1.5f;
 
@@ -147,7 +159,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "0.0"))
     float NitroRegenRate = 0.3f;
 
-    // Extra nitro gained while drifting
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "0.0"))
     float NitroDriftRegenBonus = 0.8f;
 
@@ -168,67 +179,6 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "1.0"))
     float NitroFOVLerpSpeed = 8.f;
-
-    // --- Stability Control (normal driving) ---
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability")
-    bool bEnableStabilityControl = true;
-
-    // How strongly to correct unwanted slip
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float StabilityStrength = 0.85f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "1.0", ClampMax = "15.0"))
-    float StabilitySlipThreshold = 5.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float YawDampingStrength = 0.7f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "30.0", ClampMax = "180.0"))
-    float MaxYawRateWithoutHandbrake = 80.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "1.0", ClampMax = "3.0"))
-    float StabilityGripMultiplier = 1.5f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Stability", meta = (ClampMin = "5.0"))
-    float StabilityMinSpeed = 20.f;
-
-    // --- Drift System ---
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift")
-    bool bEnableDriftAssist = true;
-
-    // Target angle for best drift boost
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "15.0", ClampMax = "60.0"))
-    float OptimalDriftAngle = 35.f;
-
-    // Hard limit before emergency correction
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "40.0", ClampMax = "90.0"))
-    float MaxDriftAngle = 65.f;
-
-    // How much throttle affects drift angle
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float ThrottleDriftControl = 0.6f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.5", ClampMax = "2.0"))
-    float DriftSteeringMultiplier = 1.3f;
-
-    // Forward momentum kept while drifting
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-    float DriftMomentumRetention = 0.7f;
-
-    // Speed boost for maintaining good drift
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.0"))
-    float DriftBoostForce = 15000.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "1.0", ClampMax = "10.0"))
-    float DriftResponsiveness = 4.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.1", ClampMax = "1.0"))
-    float DriftRearGripMultiplier = 0.4f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift", meta = (ClampMin = "0.5", ClampMax = "2.0"))
-    float DriftFrontGripMultiplier = 1.4f;
 
     // --- Camera ---
 
@@ -269,7 +219,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
     bool bShowDebug = true;
 
-    // --- Runtime State (read-only) ---
+    // --- Runtime State ---
 
     UPROPERTY(BlueprintReadOnly, Category = "State")
     float SpeedKMH = 0.f;
@@ -299,6 +249,12 @@ public:
     float DriftIntensity = 0.f;
 
     UPROPERTY(BlueprintReadOnly, Category = "State")
+    float DriftScore = 0.f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    float DriftTime = 0.f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "State")
     bool bWantsToReverse = false;
 
     UPROPERTY(BlueprintReadOnly, Category = "State|Nitro")
@@ -313,7 +269,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "State|Nitro")
     float NitroIntensity = 0.f;
 
-    // --- Blueprint Callable Functions ---
+    // --- Functions ---
 
     UFUNCTION(BlueprintCallable, Category = "Vehicle")
     void RefreshSettings();
@@ -328,7 +284,6 @@ public:
     bool CanActivateNitro() const;
 
 protected:
-    // Input handlers
     void OnThrottle(const FInputActionValue& Value);
     void OnBrake(const FInputActionValue& Value);
     void OnSteer(const FInputActionValue& Value);
@@ -337,25 +292,20 @@ protected:
     void OnNitroStart(const FInputActionValue& Value);
     void OnNitroEnd(const FInputActionValue& Value);
 
-    // Visual updates
     void UpdateWheelPositions();
     void UpdateWheelVisuals();
     void ShowDebugInfo();
 
-    // Physics systems
-    void ApplyStabilityControl(float DeltaTime);
-    void ApplyDriftPhysics(float DeltaTime);
+    void ApplyImphenziaPhysics(float DeltaTime);
     void UpdateDynamicGrip();
     float CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwardDir) const;
 
-    // Arcade physics
     void ApplyArcadePhysics(float DeltaTime);
     void ApplySpeedSensitiveSteering();
     void ApplyDownforce(float DeltaTime);
     void ApplyAirControl(float DeltaTime);
     void CheckGroundContact();
 
-    // Nitro system
     void UpdateNitro(float DeltaTime);
     void ApplyNitroBoost(float DeltaTime);
     void UpdateNitroVisuals(float DeltaTime);
@@ -369,6 +319,4 @@ private:
     float CurrentFOV = 90.f;
     float BaseEngineTorque = 0.f;
     int32 WheelsOnGround = 0;
-    float DriftAngleMomentum = 0.f;
-    float TimeDrifting = 0.f;
 };

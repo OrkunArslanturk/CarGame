@@ -6,29 +6,30 @@ UArcadeWheelFront::UArcadeWheelFront()
     WheelRadius = 35.f;
     WheelWidth = 25.f;
 
-    // === CONTROL TUNING ===
-    // Friction: HIGH to maintain steering while drifting
-    FrictionForceMultiplier = 3.5f; 
+    // === NFS-STYLE FRONT WHEEL ===
+    // High friction to maintain steering control during drifts
+    FrictionForceMultiplier = 4.0f; 
     
-    // Cornering Stiffness: High to bite into the turn instantly
-    CorneringStiffness = 900.f; //1200
+    // High cornering stiffness for instant steering response
+    CorneringStiffness = 1000.f;
     
-    SlipThreshold = 20.f;
-    SkidThreshold = 20.f;
+    // Lower thresholds for responsive feel
+    SlipThreshold = 15.f;
+    SkidThreshold = 15.f;
 
-    // Suspension
-    SuspensionMaxRaise = 12.f;
-    SuspensionMaxDrop = 12.f;
-    SpringRate = 160.f;
-    SpringPreload = 50.f;
+    // Suspension - slightly stiffer for responsive handling
+    SuspensionMaxRaise = 10.f;
+    SuspensionMaxDrop = 10.f;
+    SpringRate = 180.f;
+    SpringPreload = 60.f;
     WheelLoadRatio = 0.5f;
 
-    // Steering
+    // Steering - wider angle for deep drifts
     bAffectedBySteering = true;
-    MaxSteerAngle = 45.f; // Slightly more angle for deep drifts
+    MaxSteerAngle = 50.f;
 
-    // Brakes/Drive
-    MaxBrakeTorque = 4000.f;
+    // Brakes - strong front brakes
+    MaxBrakeTorque = 4500.f;
     MaxHandBrakeTorque = 0.f;
     bAffectedByEngine = false;
     bAffectedByHandbrake = false;
