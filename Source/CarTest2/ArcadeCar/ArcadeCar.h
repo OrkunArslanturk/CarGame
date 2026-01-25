@@ -287,7 +287,7 @@ protected:
     void UpdateWheelVisuals();
     void ShowDebugInfo();
 
-    void ApplyImphenziaPhysics(float DeltaTime);
+    void ApplyCustomPhysics(float DeltaTime);
     void UpdateDynamicGrip();
     float CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwardDir) const;
 

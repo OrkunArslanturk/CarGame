@@ -141,7 +141,7 @@ void AArcadeCar::Tick(float DeltaTime)
 
         if (bEnableArcadePhysics && !bIsAirborne)
         {
-            ApplyImphenziaPhysics(DeltaTime);
+            ApplyCustomPhysics(DeltaTime);
             ApplyArcadePhysics(DeltaTime);
         }
 
@@ -156,7 +156,7 @@ void AArcadeCar::Tick(float DeltaTime)
     ShowDebugInfo();
 }
 
-void AArcadeCar::ApplyImphenziaPhysics(float DeltaTime)
+void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
 {
     UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
     if (!PhysicsRoot) return;
