@@ -75,11 +75,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float TireGrip = 3.f;
 
+    // INCREASED: More raw power
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float EnginePower = 500.f;
+    float EnginePower = 1200.f;
 
+    // INCREASED: Higher revs for more speed
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float MaxRPM = 6500.f;
+    float MaxRPM = 8500.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float SuspensionTravel = 12.f;
@@ -104,15 +106,15 @@ public:
 
     // How strongly the car resists sliding sideways (High = Grip, Low = Ice)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Friction")
-    float DriftSideFriction = 4.0f;
+    float DriftSideFriction = 5.0f; // Increased for more control in drift
 
     // Normal driving side friction (keeps car straight)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Friction")
-    float NormalSideFriction = 10.0f;
+    float NormalSideFriction = 20.0f; // Massive increase for "Rail" stability
 
     // How quickly rotation stops when you release steering (Prevents spinning out)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift|Torque")
-    float AngularDamping = 10.0f;
+    float AngularDamping = 25.0f; // Increased to stop snapping
 
     // --- Legacy Arcade Settings (Optional Use) ---
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0", ClampMax = "1.0"))
@@ -124,8 +126,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "20.0"))
     float SteeringReductionStartSpeed = 60.f;
 
+    // INCREASED: Vacuum the car to the floor at high speeds
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0"))
-    float DownforceCoefficient = 0.5f;
+    float DownforceCoefficient = 4.0f; 
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "50.0"))
     float DownforceStartSpeed = 80.f;
@@ -137,10 +140,10 @@ public:
     float ThrottleResponseRate = 8.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "1.0", ClampMax = "3.0"))
-    float LaunchBoostMultiplier = 1.5f;
+    float LaunchBoostMultiplier = 2.0f; // Faster launch
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "10.0"))
-    float LaunchBoostMaxSpeed = 30.f;
+    float LaunchBoostMaxSpeed = 45.f;
 
     // --- Nitro System ---
 
@@ -163,13 +166,13 @@ public:
     float NitroDriftRegenBonus = 0.8f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "1.0", ClampMax = "3.0"))
-    float NitroTorqueMultiplier = 1.8f;
+    float NitroTorqueMultiplier = 2.5f; // Stronger Nitro
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "0.0"))
-    float NitroBoostForce = 50000.f;
+    float NitroBoostForce = 80000.f; // Stronger Boost
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "0.0"))
-    float NitroMaxSpeed = 250.f;
+    float NitroMaxSpeed = 350.f; // Higher Nitro Cap
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Nitro", meta = (ClampMin = "0.0", ClampMax = "2.0"))
     float NitroMinToActivate = 0.5f;
@@ -193,6 +196,12 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Camera")
     float BaseFOV = 90.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Camera|Juice")
+    float CameraDriftSwingAngle = 15.f; 
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Camera|Juice")
+    float CameraSwingSpeed = 5.f; 
 
     // --- Input Actions ---
 
@@ -309,6 +318,8 @@ protected:
     void UpdateNitro(float DeltaTime);
     void ApplyNitroBoost(float DeltaTime);
     void UpdateNitroVisuals(float DeltaTime);
+    
+    void UpdateCameraEffects(float DeltaTime);
 
 private:
     float ThrottleInput = 0.f;
