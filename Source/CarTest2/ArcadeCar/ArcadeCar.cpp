@@ -450,7 +450,8 @@ void AArcadeCar::ApplyNitroBoost(float DeltaTime)
 void AArcadeCar::UpdateNitroVisuals(float DeltaTime)
 {
     float TargetFOV = bIsNitroActive ? (BaseFOV + NitroFOVIncrease) : BaseFOV;
-    CurrentFOV = FMath::FInterpTo(CurrentFOV, TargetFOV, DeltaTime, NitroFOVLerpSpeed);
+    float InterpSpeed = (TargetFOV > CurrentFOV) ? NitroFOVLerpSpeed : 3.f;
+    CurrentFOV = FMath::FInterpTo(CurrentFOV, TargetFOV, DeltaTime, InterpSpeed);
 
     if (Camera)
     {
