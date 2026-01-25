@@ -8,6 +8,7 @@ UCLASS()
 class CARTEST2_API UArcadeWheelRear : public UChaosVehicleWheel
 {
     GENERATED_BODY()
+
 public:
     UArcadeWheelRear();
 };

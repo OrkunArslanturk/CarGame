@@ -11,10 +11,9 @@ class CARTEST2_API ARacingGameMode : public AGameModeBase
 
 public:
     ARacingGameMode();
+
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
-
-    // --- Race State ---
 
     UPROPERTY(BlueprintReadOnly, Category = "Race")
     bool bRaceActive = false;
@@ -24,8 +23,6 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Race")
     int32 TotalLaps = 3;
-
-    // --- Functions ---
 
     UFUNCTION(BlueprintCallable, Category = "Race")
     void StartRace();

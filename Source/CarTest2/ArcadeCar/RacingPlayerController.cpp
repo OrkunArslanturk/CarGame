@@ -16,7 +16,6 @@ void ARacingPlayerController::BeginPlay()
 
     SetInputMode(FInputModeGameOnly());
 
-    // Add Input Mapping Context
     if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
         ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
     {
@@ -26,7 +25,6 @@ void ARacingPlayerController::BeginPlay()
         }
     }
 
-    // Set initial respawn point
     if (GetPawn())
     {
         RespawnTransform = GetPawn()->GetActorTransform();
@@ -93,16 +91,14 @@ void ARacingPlayerController::RespawnCar()
 {
     if (!ControlledCar) return;
 
-    // 1. Stop vehicle physics immediately
-    if (UChaosWheeledVehicleMovementComponent* Vehicle = 
+    if (UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(ControlledCar->GetVehicleMovementComponent()))
     {
         Vehicle->StopMovementImmediately();
     }
 
-    // 2. Teleport to last checkpoint/start
-    FVector SpawnPos = RespawnTransform.GetLocation() + FVector(0.f, 0.f, 100.f);
-    FRotator SpawnRot = RespawnTransform.GetRotation().Rotator();
-    
+    const FVector SpawnPos = RespawnTransform.GetLocation() + FVector(0.f, 0.f, 100.f);
+    const FRotator SpawnRot = RespawnTransform.GetRotation().Rotator();
+
     ControlledCar->SetActorLocationAndRotation(SpawnPos, SpawnRot, false, nullptr, ETeleportType::ResetPhysics);
 }
