@@ -62,6 +62,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Positions")
     FVector WheelPos_RR = FVector(-140.f, 85.f, 0.f);
 
+    // Vertical offset for wheel visuals (negative = lower on car body)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Positions")
+    float WheelVisualZOffset = -15.f;
+
     // Vehicle Tuning
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float WheelRadius = 35.f;
@@ -79,10 +83,10 @@ public:
     float MaxRPM = 8500.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float SuspensionTravel = 25.f;
+    float SuspensionTravel = 25.f;  // Increased from 12 for bump absorption
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float SuspensionStiffness = 75.f;
+    float SuspensionStiffness = 75.f;  // Reduced from 150 for softer response
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float MaxSteerAngle = 40.f;
@@ -116,10 +120,10 @@ public:
     float SteeringReductionStartSpeed = 60.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0"))
-    float DownforceCoefficient = 6.0f;
+    float DownforceCoefficient = 6.0f;  // Increased from 4.0 for better grip
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "50.0"))
-    float DownforceStartSpeed = 40.f;
+    float DownforceStartSpeed = 40.f;  // Reduced from 80 to activate earlier
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0", ClampMax = "1.0"))
     float AirControlStrength = 0.4f;
@@ -312,7 +316,11 @@ private:
     float CurrentFOV = 90.f;
     float BaseEngineTorque = 0.f;
     int32 WheelsOnGround = 0;
+    
+    // Track previous wheel spin for delta rotation (prevents wobble with mirrored scale)
     float PrevWheelSpin[4] = { 0.f, 0.f, 0.f, 0.f };
+    
+    // Base wheel positions captured from BP at BeginPlay
     FVector WheelBasePositions[4];
     FVector WheelBaseScales[4];
 };
