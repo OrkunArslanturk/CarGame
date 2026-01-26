@@ -31,7 +31,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    int32 LastGear = 1; // Vites değişimini takip etmek için
+    int32 LastGear = 1; // TO FOLLOW GEAR CHANGE
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
     UAudioComponent* EngineAudioComponent;

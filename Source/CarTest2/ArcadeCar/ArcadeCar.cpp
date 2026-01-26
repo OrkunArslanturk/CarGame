@@ -67,28 +67,22 @@ AArcadeCar::AArcadeCar()
     Vehicle->WheelSetups[3].WheelClass = UArcadeWheelRear::StaticClass();
     Vehicle->WheelSetups[3].AdditionalOffset = WheelPos_RR;
 
-    /*Vehicle->EngineSetup.MaxTorque = EnginePower;
-    Vehicle->EngineSetup.MaxRPM = MaxRPM;
-    Vehicle->EngineSetup.EngineIdleRPM = 1000.f;
-    Vehicle->EngineSetup.EngineBrakeEffect = 0.5f;
-    Vehicle->EngineSetup.EngineRevUpMOI = 2.f;
-    Vehicle->EngineSetup.EngineRevDownRate = 1000.f;*/
+    ////CHANGED THESE IN BP. THAT'S WHY I MADE THEM COMMENTS
 
-    /*Vehicle->TransmissionSetup.bUseAutomaticGears = true;
-    Vehicle->TransmissionSetup.bUseAutoReverse = true;
-    Vehicle->TransmissionSetup.FinalRatio = 2.8f;
-    Vehicle->TransmissionSetup.ChangeUpRPM = 7500.f;
-    Vehicle->TransmissionSetup.ChangeDownRPM = 2500.f;
-    Vehicle->TransmissionSetup.GearChangeTime = 0.15f;*/
+    //Vehicle->EngineSetup.MaxTorque = EnginePower;
+    //Vehicle->EngineSetup.MaxRPM = MaxRPM;
+    //Vehicle->EngineSetup.EngineIdleRPM = 1000.f;
+    //Vehicle->EngineSetup.EngineBrakeEffect = 0.5f;
+    //Vehicle->EngineSetup.EngineRevUpMOI = 2.f;
+    //Vehicle->EngineSetup.EngineRevDownRate = 1000.f;
 
-    ////////////////////////////////////////////////////////////////////////////
+
     //Vehicle->TransmissionSetup.bUseAutomaticGears = true;
     //Vehicle->TransmissionSetup.bUseAutoReverse = true;
-    //Vehicle->TransmissionSetup.FinalRatio = 3.5f;   // 2.8'den 3.5'e çıkardık (Vitesler kısalır, daha seri atar)
-    //Vehicle->TransmissionSetup.ChangeUpRPM = 5200.f; // 7500 çok fazlaydı, 5200 ideal
-    //Vehicle->TransmissionSetup.ChangeDownRPM = 2000.f;
-    //Vehicle->TransmissionSetup.GearChangeTime = 0.3f; // 0.15 çok hızlıydı, 0.3 vites geçişini hissettirir
-    ////////////////////////////////////////////////////////////////////////////
+    //Vehicle->TransmissionSetup.FinalRatio = 2.8f;
+    //Vehicle->TransmissionSetup.ChangeUpRPM = 7500.f;
+    //Vehicle->TransmissionSetup.ChangeDownRPM = 2500.f;
+    //Vehicle->TransmissionSetup.GearChangeTime = 0.15f;
 
 
     Vehicle->DifferentialSetup.DifferentialType = EVehicleDifferential::RearWheelDrive;
@@ -160,6 +154,8 @@ void AArcadeCar::Tick(float DeltaTime)
         SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
         CurrentGear = Vehicle->GetCurrentGear();
 
+        ////////////////////////////////////////////////////////////////////////////
+
         // --- SOUND & GEAR UPDATE ---
         if (EngineAudioComponent && Vehicle)
         {
@@ -172,15 +168,13 @@ void AArcadeCar::Tick(float DeltaTime)
             {
                 if (GearInCode > LastGear)
                 {
-                    // Sadece sesi resetle (Vites artınca kalın ses gelmesi için)
+                    // RESET SOUND ON GEAR UP
                     EngineAudioComponent->SetPitchMultiplier(0.5f);
                 }
                 LastGear = GearInCode;
-                // BURADAKİ return; VE SetThrottleInput(0.0f); SATIRLARINI SİLDİK.
-                // Akışın devam etmesi gerekiyor ki fizik motoru yığılmasın.
             }
 
-            // Normal Ses Hesaplama
+            // SOUND CALCULATION
             float RPMRatio = FMath::Clamp(RawRPM / MaxRPMValue, 0.0f, 1.0f);
             float EffectiveRatio = FMath::Max(RPMRatio, CurrentThrottle * 0.25f);
             float TargetPitch = FMath::Lerp(0.8f, 3.0f, EffectiveRatio);
@@ -191,6 +185,8 @@ void AArcadeCar::Tick(float DeltaTime)
             CurrentRPM = RawRPM;
         }
         // --- SOUND & GEAR UPDATE ---
+
+        ////////////////////////////////////////////////////////////////////////////
 
         CheckGroundContact();
         UpdateDynamicGrip();
@@ -807,12 +803,7 @@ void AArcadeCar::UpdateWheelPositions()
     }
 
     Vehicle->EngineSetup.MaxTorque = EnginePower;
-    //Vehicle->EngineSetup.MaxRPM = MaxRPM;
-
-
-    ////////////////////////////////////////////////////////////////////////////
-    Vehicle->EngineSetup.EngineIdleRPM = 900.f; // Rölantiyi biraz düşürelim
-    ////////////////////////////////////////////////////////////////////////////
+    Vehicle->EngineSetup.MaxRPM = MaxRPM;
 
 
     for (int32 i = 0; i < Vehicle->Wheels.Num(); i++)
