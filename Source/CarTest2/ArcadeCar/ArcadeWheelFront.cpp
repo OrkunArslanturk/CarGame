@@ -10,10 +10,11 @@ UArcadeWheelFront::UArcadeWheelFront()
     SlipThreshold = 15.f;
     SkidThreshold = 15.f;
 
-    SuspensionMaxRaise = 10.f;
-    SuspensionMaxDrop = 10.f;
-    SpringRate = 180.f;
-    SpringPreload = 60.f;
+    SuspensionMaxRaise = 25.f;
+    SuspensionMaxDrop = 25.f;
+    SpringRate = 80.f;
+    SpringPreload = 30.f;
+    SuspensionDampingRatio = 1.2f;
     WheelLoadRatio = 0.5f;
 
     bAffectedBySteering = true;

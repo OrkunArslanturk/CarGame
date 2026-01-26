@@ -17,24 +17,18 @@ AArcadeCar::AArcadeCar()
     Wheel_FL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FL"));
     Wheel_FL->SetupAttachment(GetMesh());
     Wheel_FL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Wheel_FL->SetRelativeLocation(WheelPos_FL);
 
     Wheel_FR = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FR"));
     Wheel_FR->SetupAttachment(GetMesh());
     Wheel_FR->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Wheel_FR->SetRelativeLocation(WheelPos_FR);
-    Wheel_FR->SetRelativeScale3D(FVector(1.f, -1.f, 1.f));
 
     Wheel_RL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_RL"));
     Wheel_RL->SetupAttachment(GetMesh());
     Wheel_RL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Wheel_RL->SetRelativeLocation(WheelPos_RL);
 
     Wheel_RR = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_RR"));
     Wheel_RR->SetupAttachment(GetMesh());
     Wheel_RR->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Wheel_RR->SetRelativeLocation(WheelPos_RR);
-    Wheel_RR->SetRelativeScale3D(FVector(1.f, -1.f, 1.f));
 
     CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(RootComponent);
@@ -59,7 +53,7 @@ AArcadeCar::AArcadeCar()
     Vehicle->InertiaTensorScale = FVector(2.5f, 2.5f, 2.5f);
     Vehicle->DragCoefficient = 0.35f;
     Vehicle->ChassisHeight = 140.f;
-    Vehicle->CenterOfMassOverride = FVector(0.f, 0.f, -65.f);
+    Vehicle->CenterOfMassOverride = FVector(0.f, 0.f, -85.f);
     Vehicle->bEnableCenterOfMassOverride = true;
     Vehicle->bLegacyWheelFrictionPosition = false;
 
@@ -99,6 +93,17 @@ AArcadeCar::AArcadeCar()
 void AArcadeCar::BeginPlay()
 {
     Super::BeginPlay();
+    
+    TArray<UStaticMeshComponent*> WheelMeshes = { Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR };
+    for (int32 i = 0; i < 4; i++)
+    {
+        if (WheelMeshes[i])
+        {
+            WheelBasePositions[i] = WheelMeshes[i]->GetRelativeLocation();
+            WheelBaseScales[i] = WheelMeshes[i]->GetRelativeScale3D();
+        }
+    }
+    
     RefreshSettings();
 
     CurrentNitro = FMath::Clamp(StartingNitroAmount, 0.f, MaxNitroAmount);
@@ -238,6 +243,16 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
 
     FVector AngularVel = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
     float CurrentYawRate = AngularVel.Z;
+    
+    const float MinSpeedForYawControl = 8.f;
+    if (AbsSpeed < MinSpeedForYawControl)
+    {
+        float LowSpeedDamping = FMath::Lerp(AngularDamping * 2.f, AngularDamping, AbsSpeed / MinSpeedForYawControl);
+        float DampedYaw = FMath::FInterpTo(CurrentYawRate, 0.f, DeltaTime, LowSpeedDamping);
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(FVector(AngularVel.X, AngularVel.Y, DampedYaw));
+        return;
+    }
+    
     float TargetYawRate = SteerInput * MaxYawRotationSpeed;
 
     float SpeedSteeringScale = FMath::GetMappedRangeValueClamped(
@@ -296,29 +311,36 @@ void AArcadeCar::ApplyArcadePhysics(float DeltaTime)
 {
     SmoothedThrottleInput = FMath::FInterpTo(SmoothedThrottleInput, ThrottleInput, DeltaTime, ThrottleResponseRate);
 
+    UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
+    if (!PhysicsRoot) return;
+
+    float AntiBounceMass = PhysicsRoot->GetMass();
+    float AntiBounceForce = AntiBounceMass * 400.f;
+    PhysicsRoot->AddForce(FVector(0.f, 0.f, -AntiBounceForce));
+
+    FVector CurrentVelocity = PhysicsRoot->GetPhysicsLinearVelocity();
+    if (CurrentVelocity.Z > 100.f && WheelsOnGround >= 2)
+    {
+        float DampingFactor = 0.85f;
+        CurrentVelocity.Z *= DampingFactor;
+        PhysicsRoot->SetPhysicsLinearVelocity(CurrentVelocity);
+    }
+
     ApplyDownforce(DeltaTime);
 
     if (bIsAirborne)
     {
-        UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
-        if (PhysicsRoot)
-        {
-            FVector ExtraGravity = FVector(0, 0, -980.f * 2.0f) * PhysicsRoot->GetMass();
-            PhysicsRoot->AddForce(ExtraGravity);
-            ApplyAirControl(DeltaTime);
-        }
+        FVector ExtraGravity = FVector(0, 0, -980.f * 2.0f) * PhysicsRoot->GetMass();
+        PhysicsRoot->AddForce(ExtraGravity);
+        ApplyAirControl(DeltaTime);
     }
 
     if (FMath::Abs(SpeedKMH) < LaunchBoostMaxSpeed && ThrottleInput > 0.5f && !bIsAirborne)
     {
-        UPrimitiveComponent* PhysicsRoot = Cast<UPrimitiveComponent>(GetMesh());
-        if (PhysicsRoot)
-        {
-            float SpeedRatio = FMath::Abs(SpeedKMH) / LaunchBoostMaxSpeed;
-            float BoostFactor = FMath::Lerp(LaunchBoostMultiplier, 1.f, SpeedRatio);
-            FVector BoostForce = GetActorForwardVector() * (BoostFactor - 1.f) * 15000.f * ThrottleInput;
-            PhysicsRoot->AddForce(BoostForce);
-        }
+        float SpeedRatio = FMath::Abs(SpeedKMH) / LaunchBoostMaxSpeed;
+        float BoostFactor = FMath::Lerp(LaunchBoostMultiplier, 1.f, SpeedRatio);
+        FVector BoostForce = GetActorForwardVector() * (BoostFactor - 1.f) * 15000.f * ThrottleInput;
+        PhysicsRoot->AddForce(BoostForce);
     }
 }
 
@@ -372,7 +394,7 @@ void AArcadeCar::CheckGroundContact()
             }
         }
     }
-    bIsAirborne = WheelsOnGround < 2;
+    bIsAirborne = WheelsOnGround <= 1;
 }
 
 void AArcadeCar::UpdateNitro(float DeltaTime)
@@ -529,7 +551,8 @@ float AArcadeCar::CalculateSlipAngle(FVector& OutVelocityDir, FVector& OutForwar
     Forward.Z = 0.f;
 
     float Speed = Velocity.Size();
-    if (Speed < 1.f)
+    const float MinSpeedForSlip = 200.f;
+    if (Speed < MinSpeedForSlip)
     {
         OutVelocityDir = Forward;
         OutForwardDir = Forward;
@@ -725,11 +748,6 @@ void AArcadeCar::RefreshSettings()
 
 void AArcadeCar::UpdateWheelPositions()
 {
-    if (Wheel_FL) Wheel_FL->SetRelativeLocation(WheelPos_FL);
-    if (Wheel_FR) Wheel_FR->SetRelativeLocation(WheelPos_FR);
-    if (Wheel_RL) Wheel_RL->SetRelativeLocation(WheelPos_RL);
-    if (Wheel_RR) Wheel_RR->SetRelativeLocation(WheelPos_RR);
-
     UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 
@@ -770,27 +788,53 @@ void AArcadeCar::UpdateWheelVisuals()
     if (!Vehicle) return;
 
     TArray<UStaticMeshComponent*> WheelMeshes = { Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR };
-    TArray<FVector> BasePositions = { WheelPos_FL, WheelPos_FR, WheelPos_RL, WheelPos_RR };
 
     for (int32 i = 0; i < Vehicle->Wheels.Num() && i < WheelMeshes.Num(); i++)
     {
         if (UChaosVehicleWheel* PhysWheel = Vehicle->Wheels[i])
         {
-            FVector NewPos = BasePositions[i];
-            NewPos.Z += PhysWheel->GetSuspensionOffset();
+            FVector NewPos = WheelBasePositions[i];
+            
+            float SuspOffset = PhysWheel->GetSuspensionOffset();
+            NewPos.Z += SuspOffset;
+            
+            float MinZ = WheelBasePositions[i].Z - WheelRadius;
+            NewPos.Z = FMath::Max(NewPos.Z, MinZ);
+            
             WheelMeshes[i]->SetRelativeLocation(NewPos);
 
-            float SteerAngle = i < 2 ? PhysWheel->GetSteerAngle() : 0.f;
-
-            if (i < 2 && bIsDrifting)
+            float SteerAngle = 0.f;
+            if (i < 2)
             {
-                float VisualCounterSteer = CurrentSlipAngle * 1.5f;
-                SteerAngle -= VisualCounterSteer;
-                SteerAngle = FMath::Clamp(SteerAngle, -MaxSteerAngle, MaxSteerAngle);
+                SteerAngle = PhysWheel->GetSteerAngle();
+                if (bIsDrifting)
+                {
+                    SteerAngle -= CurrentSlipAngle * 1.5f;
+                    SteerAngle = FMath::Clamp(SteerAngle, -MaxSteerAngle, MaxSteerAngle);
+                }
             }
-
-            FRotator NewRot = FRotator(PhysWheel->GetRotationAngle(), SteerAngle, 0.f);
-            WheelMeshes[i]->SetRelativeRotation(NewRot);
+            
+            float CurrentSpin = PhysWheel->GetRotationAngle();
+            float DeltaSpin = CurrentSpin - PrevWheelSpin[i];
+            PrevWheelSpin[i] = CurrentSpin;
+            
+            if (FMath::Abs(DeltaSpin) > 180.f)
+            {
+                DeltaSpin = 0.f;
+            }
+            
+            bool bIsMirrored = WheelBaseScales[i].Y < 0.f;
+            if (bIsMirrored)
+            {
+                DeltaSpin = -DeltaSpin;
+            }
+            
+            FRotator CurrentRot = WheelMeshes[i]->GetRelativeRotation();
+            CurrentRot.Pitch += DeltaSpin;
+            CurrentRot.Yaw = SteerAngle;
+            CurrentRot.Roll = 0.f;
+            
+            WheelMeshes[i]->SetRelativeRotation(CurrentRot);
         }
     }
 }

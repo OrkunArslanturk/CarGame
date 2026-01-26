@@ -79,10 +79,10 @@ public:
     float MaxRPM = 8500.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float SuspensionTravel = 12.f;
+    float SuspensionTravel = 25.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float SuspensionStiffness = 150.f;
+    float SuspensionStiffness = 75.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float MaxSteerAngle = 40.f;
@@ -116,10 +116,10 @@ public:
     float SteeringReductionStartSpeed = 60.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0"))
-    float DownforceCoefficient = 4.0f;
+    float DownforceCoefficient = 6.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "50.0"))
-    float DownforceStartSpeed = 80.f;
+    float DownforceStartSpeed = 40.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade", meta = (ClampMin = "0.0", ClampMax = "1.0"))
     float AirControlStrength = 0.4f;
@@ -312,4 +312,7 @@ private:
     float CurrentFOV = 90.f;
     float BaseEngineTorque = 0.f;
     int32 WheelsOnGround = 0;
+    float PrevWheelSpin[4] = { 0.f, 0.f, 0.f, 0.f };
+    FVector WheelBasePositions[4];
+    FVector WheelBaseScales[4];
 };
