@@ -1,9 +1,15 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "WheeledVehiclePawn.h"
 #include "InputActionValue.h"
+
+////////////////////////////////////////////////////////////////////////////
+#include "Components/AudioComponent.h"
+////////////////////////////////////////////////////////////////////////////
+
 #include "ArcadeCar.generated.h"
+
 
 class UChaosWheeledVehicleMovementComponent;
 class UInputAction;
@@ -22,6 +28,15 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    int32 LastGear = 1; // Vites değişimini takip etmek için
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+    UAudioComponent* EngineAudioComponent;
+    ////////////////////////////////////////////////////////////////////////////
+
 
 #if WITH_EDITOR
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -73,7 +88,7 @@ public:
     float EnginePower = 1200.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
-    float MaxRPM = 8500.f;
+    float MaxRPM = 6000.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Tuning")
     float SuspensionTravel = 25.f;
@@ -197,6 +212,11 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category = "State")
     float SpeedKMH = 0.f;
+
+    ////////////////////////////////////////////////////////////////////////////
+    UPROPERTY(BlueprintReadOnly, Category = "State")
+    float CurrentRPM = 0.f;
+    ////////////////////////////////////////////////////////////////////////////
 
     UPROPERTY(BlueprintReadOnly, Category = "State")
     int32 CurrentGear = 0;

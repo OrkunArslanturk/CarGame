@@ -8,6 +8,7 @@
 class AArcadeCar;
 class UInputAction;
 class UInputMappingContext;
+class UUserWidget;
 
 UCLASS()
 class CARTEST2_API ARacingPlayerController : public APlayerController
@@ -44,6 +45,12 @@ public:
 
     UPROPERTY(BlueprintReadWrite, Category = "Respawn")
     FTransform RespawnTransform;
+
+    ////////////////////////////////////////////////////////////////////////////
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+    TSubclassOf<UUserWidget> HUDWidgetClass;
+    ////////////////////////////////////////////////////////////////////////////
+
 
 protected:
     void HandlePause(const FInputActionValue& Value);

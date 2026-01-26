@@ -3,6 +3,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Kismet/GameplayStatics.h"
+#include "Blueprint/UserWidget.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 
 ARacingPlayerController::ARacingPlayerController()
@@ -29,6 +30,15 @@ void ARacingPlayerController::BeginPlay()
     {
         RespawnTransform = GetPawn()->GetActorTransform();
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    if (HUDWidgetClass)
+    {
+        UUserWidget* HUD = CreateWidget<UUserWidget>(this, HUDWidgetClass);
+        HUD->AddToViewport();
+    }
+    ////////////////////////////////////////////////////////////////////////////
+
 }
 
 void ARacingPlayerController::OnPossess(APawn* InPawn)
