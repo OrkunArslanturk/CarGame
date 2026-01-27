@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "WheeledVehiclePawn.h"
@@ -116,6 +116,11 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift")
     float AngularDamping = 25.0f;
+
+
+    // MORE ARCADE DRIFT FEELING
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Drift")
+    bool bDriftKeepMomentum = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Config|Arcade")
     float DownforceCoefficient = 6.0f;

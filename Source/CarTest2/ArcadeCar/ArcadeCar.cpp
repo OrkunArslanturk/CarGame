@@ -1,4 +1,4 @@
-﻿#include "ArcadeCar.h"
+#include "ArcadeCar.h"
 #include "ArcadeWheelFront.h"
 #include "ArcadeWheelRear.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -279,7 +279,11 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
     float MaxGripAccel = 980.f * 4.0f;
     CounterAccel = FMath::Clamp(CounterAccel, -MaxGripAccel, MaxGripAccel);
 
-    PhysicsRoot->AddForce(FlatRightVec * CounterAccel, NAME_None, true);
+    // Mario Kart style: don't apply side friction during drift to keep speed
+    if (!(bIsDrifting && bDriftKeepMomentum && ThrottleInput > 0.1f))
+    {
+        PhysicsRoot->AddForce(FlatRightVec * CounterAccel, NAME_None, true);
+    }
 
     if (bIsDrifting && ThrottleInput > 0.f && ForwardSpeed > 0.f)
     {
@@ -300,7 +304,9 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
         return;
     }
     
-    float TargetYawRate = SteerInput * MaxYawRotationSpeed;
+    // Invert steering when moving backward
+    float EffectiveSteerInput = (ForwardSpeed < -5.f) ? -SteerInput : SteerInput;
+    float TargetYawRate = EffectiveSteerInput * MaxYawRotationSpeed;
 
     float SpeedSteeringScale = FMath::GetMappedRangeValueClamped(
         FVector2D(50.f, 200.f),
@@ -685,18 +691,14 @@ void AArcadeCar::OnBrake(const FInputActionValue& Value)
 
     if (BrakeInput > 0.f)
     {
+        // If going forward above threshold, just brake
         if (SpeedKMH > ReverseThresholdSpeed)
         {
             bWantsToReverse = false;
             Vehicle->SetThrottleInput(0.f);
             Vehicle->SetBrakeInput(BrakeInput);
         }
-        else if (SpeedKMH < ReverseThresholdSpeed && SpeedKMH > -ReverseThresholdSpeed)
-        {
-            bWantsToReverse = true;
-            Vehicle->SetBrakeInput(0.f);
-            Vehicle->SetThrottleInput(-BrakeInput);
-        }
+        // Otherwise (standstill or slow/reverse), go into reverse
         else
         {
             bWantsToReverse = true;
@@ -722,7 +724,9 @@ void AArcadeCar::OnSteer(const FInputActionValue& Value)
     if (UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
     {
-        Vehicle->SetSteeringInput(SteerInput);
+        // Invert steering when reversing
+        float EffectiveSteer = bWantsToReverse ? -SteerInput : SteerInput;
+        Vehicle->SetSteeringInput(EffectiveSteer);
     }
 }
 
