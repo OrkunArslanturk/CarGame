@@ -129,6 +129,14 @@ void AArcadeCar::BeginPlay()
     RefreshSettings();
 
     CurrentNitro = FMath::Clamp(StartingNitroAmount, 0.f, MaxNitroAmount);
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    // CALCULATE NITRO ON GAME START
+    NitroPercent = (MaxNitroAmount > 0.f) ? (CurrentNitro / MaxNitroAmount) : 0.f;
+
+    ////////////////////////////////////////////////////////////////////////////
+
     CurrentFOV = BaseFOV;
 
     if (UChaosWheeledVehicleMovementComponent* Vehicle =
