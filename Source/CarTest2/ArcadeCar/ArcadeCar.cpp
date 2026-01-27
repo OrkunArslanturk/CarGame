@@ -721,7 +721,8 @@ void AArcadeCar::OnBrake(const FInputActionValue& Value)
         else
         {
             bWantsToReverse = true;
-            Vehicle->SetBrakeInput(0.f);
+            Vehicle->SetBrakeInput(BrakeInput);
+            //Vehicle->SetBrakeInput(0.f);
             Vehicle->SetThrottleInput(-BrakeInput);
         }
     }
