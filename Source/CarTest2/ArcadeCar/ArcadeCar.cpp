@@ -67,23 +67,25 @@ AArcadeCar::AArcadeCar()
     Vehicle->WheelSetups[3].WheelClass = UArcadeWheelRear::StaticClass();
     Vehicle->WheelSetups[3].AdditionalOffset = WheelPos_RR;
 
-    ////CHANGED THESE IN BP. THAT'S WHY I MADE THEM COMMENTS
+    //CHANGED THESE IN BP. THAT'S WHY I MADE THEM COMMENTS
+    //MADE THEM WORK FROM HERE AGAIN
 
-    //Vehicle->EngineSetup.MaxTorque = EnginePower;
-    //Vehicle->EngineSetup.MaxRPM = MaxRPM;
-    //Vehicle->EngineSetup.EngineIdleRPM = 1000.f;
-    //Vehicle->EngineSetup.EngineBrakeEffect = 0.5f;
-    //Vehicle->EngineSetup.EngineRevUpMOI = 2.f;
-    //Vehicle->EngineSetup.EngineRevDownRate = 1000.f;
+    Vehicle->EngineSetup.MaxTorque = EnginePower;
+    Vehicle->EngineSetup.MaxRPM = MaxRPM;
+    Vehicle->EngineSetup.EngineIdleRPM = 900.f;
+    Vehicle->EngineSetup.EngineBrakeEffect = 0.5f;
+    Vehicle->EngineSetup.EngineRevUpMOI = 17.f;
+    Vehicle->EngineSetup.EngineRevDownRate = 2500.f;
 
 
-    //Vehicle->TransmissionSetup.bUseAutomaticGears = true;
-    //Vehicle->TransmissionSetup.bUseAutoReverse = true;
-    //Vehicle->TransmissionSetup.FinalRatio = 2.8f;
-    //Vehicle->TransmissionSetup.ChangeUpRPM = 7500.f;
-    //Vehicle->TransmissionSetup.ChangeDownRPM = 2500.f;
-    //Vehicle->TransmissionSetup.GearChangeTime = 0.15f;
+    Vehicle->TransmissionSetup.bUseAutomaticGears = true;
+    Vehicle->TransmissionSetup.bUseAutoReverse = true;
+    Vehicle->TransmissionSetup.FinalRatio = 4.f;
+    Vehicle->TransmissionSetup.ChangeUpRPM = 5000.f;
+    Vehicle->TransmissionSetup.ChangeDownRPM = 2000.f;
+    Vehicle->TransmissionSetup.GearChangeTime = 0.5f;
 
+    //
 
     Vehicle->DifferentialSetup.DifferentialType = EVehicleDifferential::RearWheelDrive;
     Vehicle->SteeringSetup.SteeringType = ESteeringType::AngleRatio;
