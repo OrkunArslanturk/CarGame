@@ -7,6 +7,7 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include <limits>
 
 AArcadeCar::AArcadeCar()
 {
@@ -99,6 +100,11 @@ AArcadeCar::AArcadeCar()
 
 
 
+    for (int32 i = 0; i < 4; i++)
+    {
+		PrevWheelSpin[i] = std::numeric_limits<float>::quiet_NaN();
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Sound Constructor 
     EngineAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("EngineAudioComp"));
@@ -156,7 +162,7 @@ void AArcadeCar::Tick(float DeltaTime)
         SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
         CurrentGear = Vehicle->GetCurrentGear();
 
-        ////////////////////////////////////////////////////////////////////////////
+        const bool bIsReversing = (CurrentGear == -1) || (SpeedKMH < -1.f) || bWantsToReverse;
 
         // --- SOUND & GEAR UPDATE ---
         if (EngineAudioComponent && Vehicle)
@@ -170,7 +176,6 @@ void AArcadeCar::Tick(float DeltaTime)
             {
                 if (GearInCode > LastGear)
                 {
-                    // RESET SOUND ON GEAR UP
                     EngineAudioComponent->SetPitchMultiplier(0.5f);
                 }
                 LastGear = GearInCode;
@@ -178,7 +183,7 @@ void AArcadeCar::Tick(float DeltaTime)
 
             // SOUND CALCULATION
             float RPMRatio = FMath::Clamp(RawRPM / MaxRPMValue, 0.0f, 1.0f);
-            float EffectiveRatio = FMath::Max(RPMRatio, CurrentThrottle * 0.25f);
+            float EffectiveRatio = FMath::Max(RPMRatio, FMath::Abs(CurrentThrottle) * 0.25f);
             float TargetPitch = FMath::Lerp(0.8f, 3.0f, EffectiveRatio);
 
             float NewPitch = FMath::FInterpTo(EngineAudioComponent->PitchMultiplier, TargetPitch, DeltaTime, 15.0f);
@@ -186,20 +191,24 @@ void AArcadeCar::Tick(float DeltaTime)
 
             CurrentRPM = RawRPM;
         }
-        // --- SOUND & GEAR UPDATE ---
-
-        ////////////////////////////////////////////////////////////////////////////
 
         CheckGroundContact();
-        UpdateDynamicGrip();
-
-        if (bEnableArcadePhysics && !bIsAirborne)
+        
+        // ONLY apply custom arcade physics whrn reversing
+        if (bEnableArcadePhysics && !bIsAirborne && !bIsReversing)
         {
+            UpdateDynamicGrip();
             ApplyCustomPhysics(DeltaTime);
             ApplyArcadePhysics(DeltaTime);
         }
+        else
+        {
+            // Reset drift state if enter reverse
+            bIsDrifting = false;
+            DriftScore = 0.f;
+        }
 
-        if (bEnableNitro)
+        if (bEnableNitro && !bIsReversing)
         {
             UpdateNitro(DeltaTime);
         }
@@ -304,7 +313,6 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
         return;
     }
     
-    // Invert steering when moving backward
     float EffectiveSteerInput = (ForwardSpeed < -5.f) ? -SteerInput : SteerInput;
     float TargetYawRate = EffectiveSteerInput * MaxYawRotationSpeed;
 
@@ -534,12 +542,23 @@ void AArcadeCar::UpdateCameraEffects(float DeltaTime)
 {
     if (!CameraArm) return;
 
+    float TargetDistance = CameraDistance;
     float TargetYawOffset = 0.f;
-    if (bIsDrifting)
+
+    const bool bIsReversing = (CurrentGear == -1) || (SpeedKMH < -1.f) || bWantsToReverse;
+
+    if (bIsReversing)
+    {
+        // far camera for reverse
+        TargetDistance = CameraDistance * 1.8f;
+    }
+    else if (bIsDrifting)
     {
         float SlipRatio = FMath::Clamp(CurrentSlipAngle / 45.f, -1.f, 1.f);
         TargetYawOffset = SlipRatio * CameraDriftSwingAngle;
     }
+
+    CameraArm->TargetArmLength = FMath::FInterpTo(CameraArm->TargetArmLength, TargetDistance, DeltaTime, 2.0f);
 
     FRotator CurrentRot = CameraArm->GetRelativeRotation();
     float NewYaw = FMath::FInterpTo(CurrentRot.Yaw, TargetYawOffset, DeltaTime, CameraSwingSpeed);
@@ -689,16 +708,16 @@ void AArcadeCar::OnBrake(const FInputActionValue& Value)
 
     if (!Vehicle) return;
 
+
+    const float LocalSpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
     if (BrakeInput > 0.f)
     {
-        // If going forward above threshold, just brake
-        if (SpeedKMH > ReverseThresholdSpeed)
+        if (LocalSpeedKMH > ReverseThresholdSpeed)
         {
             bWantsToReverse = false;
-            Vehicle->SetThrottleInput(0.f);
             Vehicle->SetBrakeInput(BrakeInput);
+            Vehicle->SetThrottleInput(0.f);
         }
-        // Otherwise (standstill or slow/reverse), go into reverse
         else
         {
             bWantsToReverse = true;
@@ -708,9 +727,9 @@ void AArcadeCar::OnBrake(const FInputActionValue& Value)
     }
     else
     {
-        bWantsToReverse = false;
         if (ThrottleInput <= 0.f)
         {
+            bWantsToReverse = false;
             Vehicle->SetBrakeInput(0.f);
             Vehicle->SetThrottleInput(0.f);
         }
@@ -724,9 +743,7 @@ void AArcadeCar::OnSteer(const FInputActionValue& Value)
     if (UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
     {
-        // Invert steering when reversing
-        float EffectiveSteer = bWantsToReverse ? -SteerInput : SteerInput;
-        Vehicle->SetSteeringInput(EffectiveSteer);
+        Vehicle->SetSteeringInput(SteerInput);
     }
 }
 
@@ -854,6 +871,7 @@ void AArcadeCar::UpdateWheelVisuals()
             if (i < 2)
             {
                 SteerAngle = PhysWheel->GetSteerAngle();
+                
                 if (bIsDrifting)
                 {
                     SteerAngle -= CurrentSlipAngle * 1.5f;
@@ -862,14 +880,12 @@ void AArcadeCar::UpdateWheelVisuals()
             }
             
             float CurrentSpin = PhysWheel->GetRotationAngle();
-            float DeltaSpin = CurrentSpin - PrevWheelSpin[i];
-            PrevWheelSpin[i] = CurrentSpin;
-            
-            if (FMath::Abs(DeltaSpin) > 180.f)
+            float DeltaSpin = 0.f;
+            if (FMath::IsFinite(PrevWheelSpin[i]))
             {
-                DeltaSpin = 0.f;
+                DeltaSpin = FMath::FindDeltaAngleDegrees(PrevWheelSpin[i], CurrentSpin);
             }
-            
+            PrevWheelSpin[i] = CurrentSpin;
             bool bIsMirrored = WheelBaseScales[i].Y < 0.f;
             if (bIsMirrored)
             {
