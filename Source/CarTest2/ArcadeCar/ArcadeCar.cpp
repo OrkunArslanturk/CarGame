@@ -68,7 +68,9 @@ AArcadeCar::AArcadeCar()
     Vehicle->WheelSetups[3].WheelClass = UArcadeWheelRear::StaticClass();
     Vehicle->WheelSetups[3].AdditionalOffset = WheelPos_RR;
 
-    //CHANGED THESE IN BP. THAT'S WHY I MADE THEM COMMENTS
+
+    //?CHANGED THESE IN BP. THAT'S WHY I MADE THEM COMMENTS?
+
     //MADE THEM WORK FROM HERE AGAIN
 
     Vehicle->EngineSetup.MaxTorque = EnginePower;
@@ -156,6 +158,15 @@ void AArcadeCar::BeginPlay()
             }
         }
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    //Hide mouse cursor on game start
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        PC->SetInputMode(FInputModeGameOnly());
+        PC->bShowMouseCursor = false;
+    }
+    ////////////////////////////////////////////////////////////////////////////
 }
 
 void AArcadeCar::Tick(float DeltaTime)
