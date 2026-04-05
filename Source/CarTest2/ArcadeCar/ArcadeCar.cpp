@@ -12,23 +12,23 @@
 AArcadeCar::AArcadeCar()
 {
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-    BodyMesh->SetupAttachment(GetMesh());
+    BodyMesh->SetupAttachment(RootComponent);
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     Wheel_FL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FL"));
-    Wheel_FL->SetupAttachment(GetMesh());
+    Wheel_FL->SetupAttachment(RootComponent);
     Wheel_FL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     Wheel_FR = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_FR"));
-    Wheel_FR->SetupAttachment(GetMesh());
+    Wheel_FR->SetupAttachment(RootComponent);
     Wheel_FR->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     Wheel_RL = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_RL"));
-    Wheel_RL->SetupAttachment(GetMesh());
+    Wheel_RL->SetupAttachment(RootComponent);
     Wheel_RL->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     Wheel_RR = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Wheel_RR"));
-    Wheel_RR->SetupAttachment(GetMesh());
+    Wheel_RR->SetupAttachment(RootComponent);
     Wheel_RR->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
@@ -302,6 +302,15 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
     {
         FrictionAmount = NormalSideFriction;
     }
+    
+    // LOW SPEED FIX
+    float SpeedFactor = FMath::GetMappedRangeValueClamped(
+        FVector2D(0.f, 30.f),   // 0–30 km/h arası
+        FVector2D(0.2f, 1.0f),  // %20 → %100 friction
+        AbsSpeed
+    );
+
+    FrictionAmount *= SpeedFactor;
 
     float CounterAccel = -SideSpeed * FrictionAmount;
     float MaxGripAccel = 980.f * 4.0f;
@@ -319,6 +328,12 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
         FVector MomentumBoost = FlatForwardVec * SpeedRetention * 5000.f * SmoothedThrottleInput;
         PhysicsRoot->AddForce(MomentumBoost, NAME_None, true);
     }
+    // LOW SPEED FORWARD BOOST
+    if (AbsSpeed < 15.f && ThrottleInput > 0.1f)
+    {
+        FVector Boost = FlatForwardVec * 8000.f * ThrottleInput;
+        PhysicsRoot->AddForce(Boost, NAME_None, true);
+    }
 
     FVector AngularVel = PhysicsRoot->GetPhysicsAngularVelocityInDegrees();
     float CurrentYawRate = AngularVel.Z;
@@ -326,10 +341,14 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
     const float MinSpeedForYawControl = 8.f;
     if (AbsSpeed < MinSpeedForYawControl)
     {
-        float LowSpeedDamping = FMath::Lerp(AngularDamping * 2.f, AngularDamping, AbsSpeed / MinSpeedForYawControl);
-        float DampedYaw = FMath::FInterpTo(CurrentYawRate, 0.f, DeltaTime, LowSpeedDamping);
-        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(FVector(AngularVel.X, AngularVel.Y, DampedYaw));
-        return;
+        // sadece hafif damping yap, kilitleme
+        float DampedYaw = FMath::FInterpTo(CurrentYawRate, 0.f, DeltaTime, 2.0f);
+
+        PhysicsRoot->SetPhysicsAngularVelocityInDegrees(
+            FVector(AngularVel.X, AngularVel.Y, DampedYaw)
+        );
+
+        // return
     }
     
     float EffectiveSteerInput = (ForwardSpeed < -5.f) ? -SteerInput : SteerInput;
@@ -385,6 +404,20 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
     }
 
     DriftDirection = FMath::Sign(CurrentSlipAngle);
+}
+
+void AArcadeCar::SetAIInputs(float Throttle, float Brake, float Steer)
+{
+    ThrottleInput = Throttle;
+    BrakeInput = Brake;
+    SteerInput = Steer;
+
+    if (auto* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
+    {
+        Vehicle->SetThrottleInput(Throttle);
+        Vehicle->SetBrakeInput(Brake);
+        Vehicle->SetSteeringInput(Steer);
+    }
 }
 
 void AArcadeCar::ApplyArcadePhysics(float DeltaTime)

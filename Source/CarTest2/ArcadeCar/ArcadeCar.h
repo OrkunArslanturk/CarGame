@@ -29,6 +29,7 @@ public:
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+    void SetAIInputs(float Throttle, float Brake, float Steer);
     ////////////////////////////////////////////////////////////////////////////
 
     int32 LastGear = 1; // TO FOLLOW GEAR CHANGE
