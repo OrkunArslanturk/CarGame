@@ -57,7 +57,7 @@ void AAI_ArcadeCar::SetSteer(float Value)
 	if (auto* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
 	{
 		// SMOOTH STEERING
-		CurrentSteer = FMath::FInterpTo(CurrentSteer, Value, GetWorld()->GetDeltaSeconds(), 1.5f);
+		CurrentSteer = FMath::FInterpTo(CurrentSteer, Value, GetWorld()->GetDeltaSeconds(), 4.0f);
 
 	}
 }

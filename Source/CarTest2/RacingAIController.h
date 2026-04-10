@@ -21,8 +21,8 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnPossess(APawn* InPawn) override;
-	FVector GetTargetLocation() const;
-
+	
+	FVector SmoothedTargetLocation;
 protected:
 
 	UPROPERTY()

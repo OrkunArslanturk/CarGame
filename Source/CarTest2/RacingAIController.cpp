@@ -22,115 +22,127 @@ void ARacingAIController::OnPossess(APawn* InPawn)
 
 void ARacingAIController::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
-	if (!Car || !RacingSpline) return;
+    if (!Car || !RacingSpline) return;
 
-	FVector CarLocation = Car->GetActorLocation();
-	FVector Forward = Car->GetActorForwardVector();
+    FVector CarLocation = Car->GetActorLocation();
+    FVector Forward = Car->GetActorForwardVector();
+    FVector Right = Car->GetActorRightVector();
 
-	// --- SPLINE CLOSEST POINT ---
-	float ClosestKey =
-		RacingSpline->Spline->FindInputKeyClosestToWorldLocation(CarLocation);
+    // --- SPLINE CLOSEST POINT ---
+    float ClosestKey =
+        RacingSpline->Spline->FindInputKeyClosestToWorldLocation(CarLocation);
 
-	float ClosestDistance =
-		RacingSpline->Spline->GetDistanceAlongSplineAtSplineInputKey(ClosestKey);
+    float ClosestDistance =
+        RacingSpline->Spline->GetDistanceAlongSplineAtSplineInputKey(ClosestKey);
 
-	// --- SPEED ---
-	float Speed = Car->GetVelocity().Size();
+    // --- SPEED ---
+    float Speed = Car->GetVelocity().Size();
 
-	// --- BASE LOOKAHEAD ---
-	float BaseLookAhead =
-		FMath::GetMappedRangeValueClamped(
-			FVector2D(0.f, 4000.f),
-			FVector2D(600.f, 1800.f),
-			Speed
-		);
+    // --- BASE LOOKAHEAD ---
+    float BaseLookAhead =
+        FMath::GetMappedRangeValueClamped(
+            FVector2D(0.f, 4000.f),
+            FVector2D(600.f, 1800.f),
+            Speed
+        );
 
-	// --- TARGET POINT ---
-	float TargetDistance = ClosestDistance + BaseLookAhead;
+    // --- TARGET POINT (FIRST PASS) ---
+    float TargetDistance = ClosestDistance + BaseLookAhead;
 
-	FVector TargetLocation =
-		RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
-			TargetDistance,
-			ESplineCoordinateSpace::World
-		);
+    FVector TargetLocation =
+        RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
+            TargetDistance,
+            ESplineCoordinateSpace::World
+        );
 
-	FVector ToTarget = (TargetLocation - CarLocation).GetSafeNormal();
+    // -------------------------------
+    // SMOOTH TARGET
+    // -------------------------------
+    SmoothedTargetLocation = FMath::VInterpTo(
+        SmoothedTargetLocation,
+        TargetLocation,
+        DeltaTime,
+        5.0f
+    );
 
-	// --- STEERING CALCULATION ---
-	float Dot = FVector::DotProduct(Forward, ToTarget);
-	float Cross = FVector::CrossProduct(Forward, ToTarget).Z;
+    FVector ToTarget = (SmoothedTargetLocation - CarLocation).GetSafeNormal();
 
-	float Angle = FMath::Acos(FMath::Clamp(Dot, -1.f, 1.f)); // radians
-	float SignedAngle = Angle * FMath::Sign(Cross);
+    // --- STEERING (STABLE VERSION) ---
+    float SteerTarget = FVector::DotProduct(Right, ToTarget);
+    SteerTarget = FMath::Clamp(SteerTarget, -1.f, 1.f);
 
-	// Normalize to [-1,1]
-	float SteerTarget = FMath::Clamp(SignedAngle * 2.0f, -1.f, 1.f);
+    // --- TURN STRENGTH ---
+    float TurnStrength = FMath::Abs(SteerTarget);
 
-	// --- TURN STRENGTH ---
-	float TurnStrength = FMath::Abs(SteerTarget);
+    // --- DYNAMIC LOOKAHEAD ---
+    float DynamicLookAhead = FMath::Lerp(BaseLookAhead, BaseLookAhead * 0.5f, TurnStrength);
 
-	// --- DYNAMIC LOOKAHEAD (virajda azalt) ---
-	float DynamicLookAhead = FMath::Lerp(BaseLookAhead, BaseLookAhead * 0.5f, TurnStrength);
+    TargetDistance = ClosestDistance + DynamicLookAhead;
 
-	TargetDistance = ClosestDistance + DynamicLookAhead;
+    TargetLocation =
+        RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
+            TargetDistance,
+            ESplineCoordinateSpace::World
+        );
 
-	TargetLocation =
-		RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
-			TargetDistance,
-			ESplineCoordinateSpace::World
-		);
+    // AGAIN SMOOTH
+    SmoothedTargetLocation = FMath::VInterpTo(
+        SmoothedTargetLocation,
+        TargetLocation,
+        DeltaTime,
+        5.0f
+    );
 
-	ToTarget = (TargetLocation - CarLocation).GetSafeNormal();
+    ToTarget = (SmoothedTargetLocation - CarLocation).GetSafeNormal();
 
-	// Recalculate steering with new target
-	Dot = FVector::DotProduct(Forward, ToTarget);
-	Cross = FVector::CrossProduct(Forward, ToTarget).Z;
+    // --- FINAL STEERING ---
+    SteerTarget = FVector::DotProduct(Right, ToTarget);
+    SteerTarget = FMath::Clamp(SteerTarget, -1.f, 1.f);
 
-	Angle = FMath::Acos(FMath::Clamp(Dot, -1.f, 1.f));
-	SignedAngle = Angle * FMath::Sign(Cross);
+    // DEADZONE (zigzag fix)
+    if (FMath::Abs(SteerTarget) < 0.05f)
+    {
+        SteerTarget = 0.f;
+    }
 
-	SteerTarget = FMath::Clamp(SignedAngle * 1.5f, -1.f, 1.f);
+    // LOW SPEED FIX
+    float SpeedKMH = Speed * 0.036f;
+    if (SpeedKMH < 30.f)
+    {
+        SteerTarget *= 0.5f;
+    }
 
-	// --- FINAL STEER (SMOOTHED INSIDE CAR) ---
-	Car->SetSteer(SteerTarget);
+    Car->SetSteer(SteerTarget);
 
-	// --- THROTTLE + BRAKE LOGIC ---
-	
-	float Throttle = 1.f;
-	float Brake = 0.f;
+    // --- THROTTLE ---
+    float Throttle = 1.f;
+    float Brake = 0.f;
 
-	if (Throttle > 0.1f)
-	{
-		Brake = 0.f;
-	}
-	
-	if (TurnStrength > 0.7f)
-	{
-		Throttle = 0.2f;
-		// Brake = 0.4f;
-	}
-	else if (TurnStrength > 0.4f)
-	{
-		Throttle = 0.5f;
-	}
-	else
-	{
-		Throttle = 1.f;
-	}
+    if (TurnStrength > 0.7f)
+    {
+        Throttle = 0.2f;
+    }
+    else if (TurnStrength > 0.4f)
+    {
+        Throttle = 0.5f;
+    }
+    else
+    {
+        Throttle = 1.f;
+    }
 
-	// Speed limiter (çok hızlandıysa gaz kes)
-	float SpeedKMH = Speed * 0.036f;
-	if (SpeedKMH < 15.f)
-	{
-		Throttle = 1.0f; // full gazla kaldır
-	}
-	if (SpeedKMH > 180.f)
-	{
-		Throttle = 0.3f;
-	}
+    if (SpeedKMH < 15.f)
+    {
+        Throttle = 1.0f;
+    }
 
-	Car->SetThrottle(Throttle);
-	Car->SetBrake(Brake);
+    if (SpeedKMH > 180.f)
+    {
+        Throttle = 0.3f;
+    }
+
+    Car->SetThrottle(Throttle);
+    Car->SetBrake(Brake);
 }
