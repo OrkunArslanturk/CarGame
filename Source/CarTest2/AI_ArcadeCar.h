@@ -24,6 +24,7 @@ public:
 	void SetThrottle(float Value);
 	void SetSteer(float Value);
 	void SetBrake(float Value);
+	float GetCurrentSteer() const { return CurrentSteer; }
 
 private:
 

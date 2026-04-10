@@ -66,7 +66,7 @@ void ARacingAIController::Tick(float DeltaTime)
 	float SignedAngle = Angle * FMath::Sign(Cross);
 
 	// Normalize to [-1,1]
-	float SteerTarget = FMath::Clamp(SignedAngle * 0.8f, -1.f, 1.f);
+	float SteerTarget = FMath::Clamp(SignedAngle * 2.0f, -1.f, 1.f);
 
 	// --- TURN STRENGTH ---
 	float TurnStrength = FMath::Abs(SteerTarget);

@@ -305,8 +305,8 @@ void AArcadeCar::ApplyCustomPhysics(float DeltaTime)
     
     // LOW SPEED FIX
     float SpeedFactor = FMath::GetMappedRangeValueClamped(
-        FVector2D(0.f, 30.f),   // 0–30 km/h arası
-        FVector2D(0.2f, 1.0f),  // %20 → %100 friction
+        FVector2D(0.f, 30.f),   // 0–30 km/h
+        FVector2D(0.2f, 1.0f),  // %20 to %100 friction
         AbsSpeed
     );
 
