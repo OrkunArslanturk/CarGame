@@ -31,7 +31,7 @@ void AAI_ArcadeCar::Tick(float DeltaTime)
 	SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
 
 	float FinalThrottle = AIThrottle;
-	float FinalBrake = 0.f;
+	float FinalBrake = AIBrake;
 
 	// Launch boost
 	if (SpeedKMH < 5.f && AIThrottle > 0.1f)
@@ -40,6 +40,8 @@ void AAI_ArcadeCar::Tick(float DeltaTime)
 	}
 
 	SetAIInputs(FinalThrottle, FinalBrake, CurrentSteer);
+	
+	SetBrake(0.f);
 }
 
 void AAI_ArcadeCar::BeginPlay()

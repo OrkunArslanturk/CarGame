@@ -2,6 +2,7 @@
 #include "AI_ArcadeCar.h"
 #include "RacingSpline.h"
 #include "Kismet/GameplayStatics.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/SplineComponent.h"
 
 void ARacingAIController::BeginPlay()
@@ -12,6 +13,23 @@ void ARacingAIController::BeginPlay()
 		UGameplayStatics::GetActorOfClass(GetWorld(), ARacingSpline::StaticClass())
 	);
 
+	if (RacingSpline)
+	{
+		float StartDistance = 0.f;
+
+		LastSafeLocation =
+			RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
+				StartDistance,
+				ESplineCoordinateSpace::World
+			);
+
+		LastSafeRotation =
+			RacingSpline->Spline->GetRotationAtDistanceAlongSpline(
+				StartDistance,
+				ESplineCoordinateSpace::World
+			);
+	}
+	
 	TArray<AActor*> FoundCars;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AAI_ArcadeCar::StaticClass(), FoundCars);
 
@@ -23,10 +41,6 @@ void ARacingAIController::BeginPlay()
 			AllCars.Add(Other);
 		}
 	}
-
-	// başlangıç lane
-	CurrentLaneOffset = Car->LaneOffset;
-	TargetLaneOffset = Car->LaneOffset;
 }
 
 void ARacingAIController::OnPossess(APawn* InPawn)
@@ -34,6 +48,12 @@ void ARacingAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	Car = Cast<AAI_ArcadeCar>(InPawn);
+	
+	if (Car)
+	{
+		CurrentLaneOffset = Car->LaneOffset;
+		TargetLaneOffset = Car->LaneOffset;
+	}
 }
 
 void ARacingAIController::Tick(float DeltaTime)
@@ -63,7 +83,7 @@ void ARacingAIController::Tick(float DeltaTime)
 
 		float ForwardDot = FVector::DotProduct(Forward, ToOther.GetSafeNormal());
 
-		if (ForwardDot > 0.5f) // önünde mi?
+		if (ForwardDot > 0.5f) // Is it front
 		{
 			float Dist = ToOther.Size();
 
@@ -120,13 +140,47 @@ void ARacingAIController::Tick(float DeltaTime)
 	// If there is cornewr
 	if (CornerStrength > 0.2f)
 	{
-		ApexOffset = CornerSign * 200.f; // left-right offset
+		ApexOffset = CornerSign * 100.f; // left-right offset
 	}
 
 
 	// SPEED
 	float Speed = Car->GetVelocity().Size();
 	float SpeedKMH = Speed * 0.036f;
+	
+	// --- STUCK DETECTION ---
+	float Movement = FVector::Dist(CarLocation, LastLocation);
+
+	if (Movement < 5.f && SpeedKMH < 5.f)
+	{
+		StuckTime += DeltaTime;
+	}
+	else
+	{
+		StuckTime = 0.f;
+	}
+
+	LastLocation = CarLocation;
+	
+	// --- SAVE SAFE POINT ---
+		SafeUpdateTimer += DeltaTime;
+
+		if (SafeUpdateTimer > 0.5f)
+		{
+			LastSafeLocation =
+				RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
+					ClosestDistance,
+					ESplineCoordinateSpace::World
+				);
+
+			LastSafeRotation =
+				RacingSpline->Spline->GetRotationAtDistanceAlongSpline(
+					ClosestDistance,
+					ESplineCoordinateSpace::World
+				);
+
+			SafeUpdateTimer = 0.f;
+		}
 
 	// LOOKAHEAD
 	float LookAhead =
@@ -151,6 +205,7 @@ void ARacingAIController::Tick(float DeltaTime)
 		);
 
 	float FinalOffset = CurrentLaneOffset + ApexOffset;
+	FinalOffset = FMath::Clamp(FinalOffset, -300.f, 300.f);
 	TargetLocation += SplineRight * FinalOffset;
 
 	// SMOOTH 
@@ -163,6 +218,32 @@ void ARacingAIController::Tick(float DeltaTime)
 
 	FVector ToTarget = (SmoothedTargetLocation - CarLocation).GetSafeNormal();
 
+	// --- RESET IF STUCK ---
+	if (StuckTime > 2.0f)
+	{
+		FVector ResetLocation = LastSafeLocation + Forward * 200.f;
+
+		Car->SetActorLocationAndRotation(
+			ResetLocation,
+			LastSafeRotation,
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics
+		);
+
+		UPrimitiveComponent* Mesh = Cast<UPrimitiveComponent>(Car->GetMesh());
+
+		if (Mesh)
+		{
+			Mesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			Mesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
+
+		StuckTime = 0.f;
+
+		return;
+	}
+	
 	// STEERING
 	float SteerTarget = FVector::DotProduct(Right, ToTarget);
 

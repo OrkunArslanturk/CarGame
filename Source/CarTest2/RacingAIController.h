@@ -40,4 +40,11 @@ protected:
 	float CurrentLaneOffset = 0.f;
 	float TargetLaneOffset = 0.f;
 	
+	float StuckTime = 0.f;
+	FVector LastLocation;
+
+	FVector LastSafeLocation;
+	FRotator LastSafeRotation;
+	float SafeUpdateTimer = 0.f;
+	
 };
