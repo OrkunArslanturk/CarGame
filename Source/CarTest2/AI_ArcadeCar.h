@@ -25,7 +25,9 @@ public:
 	void SetSteer(float Value);
 	void SetBrake(float Value);
 	float GetCurrentSteer() const { return CurrentSteer; }
-
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI")
+	float LaneOffset = 0.f;
 private:
 
 	//  Smooth steering 

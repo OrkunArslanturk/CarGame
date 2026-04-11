@@ -33,4 +33,5 @@ protected:
 
 	UPROPERTY(EditAnywhere)
 	float LookAheadDistance = 1200.f;
+	
 };

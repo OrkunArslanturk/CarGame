@@ -55,17 +55,17 @@ void ARacingAIController::Tick(float DeltaTime)
     float CornerStrength = FMath::Abs(CornerSign);
 
     // If there is cornewr
-    if (CornerStrength > 0.1f)
+    if (CornerStrength > 0.2f)  
     {
-        ApexOffset = CornerSign * 300.f; // left-right offset
+        ApexOffset = CornerSign * 200.f; // left-right offset
     }
     
     
-    // --- SPEED ---
+    // SPEED
     float Speed = Car->GetVelocity().Size();
     float SpeedKMH = Speed * 0.036f;
 
-    // --- LOOKAHEAD (SADECE BUNA DOKUNUYORUZ) ---
+    // LOOKAHEAD
     float LookAhead =
         FMath::GetMappedRangeValueClamped(
             FVector2D(0.f, 4000.f),
@@ -81,7 +81,16 @@ void ARacingAIController::Tick(float DeltaTime)
             ESplineCoordinateSpace::World
         );
 
-    // --- SMOOTH TARGET (TEK KERE) ---
+    FVector SplineRight =
+      RacingSpline->Spline->GetRightVectorAtDistanceAlongSpline(
+          TargetDistance,
+          ESplineCoordinateSpace::World
+      );
+
+    float FinalOffset = Car->LaneOffset + ApexOffset;
+    TargetLocation += SplineRight * FinalOffset;
+
+    // SMOOTH 
     SmoothedTargetLocation = FMath::VInterpTo(
         SmoothedTargetLocation,
         TargetLocation,
@@ -91,18 +100,10 @@ void ARacingAIController::Tick(float DeltaTime)
 
     FVector ToTarget = (SmoothedTargetLocation - CarLocation).GetSafeNormal();
     
-    FVector SplineRight =
-    RacingSpline->Spline->GetRightVectorAtDistanceAlongSpline(
-        TargetDistance,
-        ESplineCoordinateSpace::World
-    );
-
-    TargetLocation += SplineRight * ApexOffset;
-
-    // --- STEERING (EN STABLE YÖNTEM) ---
+    // STEERING
     float SteerTarget = FVector::DotProduct(Right, ToTarget);
 
-    // küçük clamp
+    // clamp
     SteerTarget = FMath::Clamp(SteerTarget, -1.f, 1.f);
 
     // DEADZONE
