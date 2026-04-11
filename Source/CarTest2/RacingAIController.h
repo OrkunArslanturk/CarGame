@@ -34,4 +34,10 @@ protected:
 	UPROPERTY(EditAnywhere)
 	float LookAheadDistance = 1200.f;
 	
+	UPROPERTY()
+	TArray<AAI_ArcadeCar*> AllCars;
+
+	float CurrentLaneOffset = 0.f;
+	float TargetLaneOffset = 0.f;
+	
 };
