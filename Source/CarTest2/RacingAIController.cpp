@@ -103,6 +103,8 @@ void ARacingAIController::Tick(float DeltaTime)
     // STEERING
     float SteerTarget = FVector::DotProduct(Right, ToTarget);
 
+    // skill effect
+    SteerTarget *= Car->Skill;
     // clamp
     SteerTarget = FMath::Clamp(SteerTarget, -1.f, 1.f);
 
@@ -127,11 +129,11 @@ void ARacingAIController::Tick(float DeltaTime)
 
     if (TurnStrength > 0.6f)
     {
-        Throttle = 0.4f;
+        Throttle = FMath::Lerp(0.3f, 0.5f, Car->Skill);
     }
     else if (TurnStrength > 0.3f)
     {
-        Throttle = 0.7f;
+        Throttle = FMath::Lerp(0.6f, 0.8f, Car->Skill);
     }
 
     if (SpeedKMH > 180.f)

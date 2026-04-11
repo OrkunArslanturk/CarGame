@@ -42,6 +42,24 @@ void AAI_ArcadeCar::Tick(float DeltaTime)
 	SetAIInputs(FinalThrottle, FinalBrake, CurrentSteer);
 }
 
+void AAI_ArcadeCar::BeginPlay()
+{
+	Super::BeginPlay();
+
+	switch (AILevel)
+	{
+	case EAILevel::Normal:
+		Skill = 0.9f;
+		Aggression = 0.8f;
+		break;
+
+	case EAILevel::VeryGood:
+		Skill = 1.2f;
+		Aggression = 1.5f;
+		break;
+	}
+}
+
 void AAI_ArcadeCar::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// no input
@@ -57,8 +75,9 @@ void AAI_ArcadeCar::SetSteer(float Value)
 	if (auto* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent()))
 	{
 		// SMOOTH STEERING
-		CurrentSteer = FMath::FInterpTo(CurrentSteer, Value, GetWorld()->GetDeltaSeconds(), 4.0f);
+		float InterpSpeed = FMath::Lerp(3.0f, 8.0f, Skill - 0.8f);
 
+		CurrentSteer = FMath::FInterpTo(CurrentSteer, Value, GetWorld()->GetDeltaSeconds(), InterpSpeed);
 	}
 }
 
