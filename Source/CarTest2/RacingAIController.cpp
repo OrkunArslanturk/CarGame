@@ -29,18 +29,6 @@ void ARacingAIController::BeginPlay()
 				ESplineCoordinateSpace::World
 			);
 	}
-	
-	TArray<AActor*> FoundCars;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AAI_ArcadeCar::StaticClass(), FoundCars);
-
-	for (AActor* Actor : FoundCars)
-	{
-		AAI_ArcadeCar* Other = Cast<AAI_ArcadeCar>(Actor);
-		if (Other && Other != Car)
-		{
-			AllCars.Add(Other);
-		}
-	}
 }
 
 void ARacingAIController::OnPossess(APawn* InPawn)
@@ -48,12 +36,32 @@ void ARacingAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	Car = Cast<AAI_ArcadeCar>(InPawn);
-	
-	if (Car)
+
+	if (!Car) return;
+
+	// clean cars
+	AllCars.Empty();
+
+	TArray<AActor*> FoundCars;
+	UGameplayStatics::GetAllActorsOfClass(
+		GetWorld(),
+		AAI_ArcadeCar::StaticClass(),
+		FoundCars
+	);
+
+	for (AActor* Actor : FoundCars)
 	{
-		CurrentLaneOffset = Car->LaneOffset;
-		TargetLaneOffset = Car->LaneOffset;
+		AAI_ArcadeCar* Other = Cast<AAI_ArcadeCar>(Actor);
+
+		if (IsValid(Other) && Other != Car)
+		{
+			AllCars.Add(Other);
+		}
 	}
+
+	// lane
+	CurrentLaneOffset = Car->LaneOffset;
+	TargetLaneOffset = Car->LaneOffset;
 }
 
 void ARacingAIController::Tick(float DeltaTime)
@@ -61,6 +69,11 @@ void ARacingAIController::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	if (!Car || !RacingSpline) return;
+
+	AllCars.RemoveAll([](AAI_ArcadeCar* Car)
+	{
+		return !IsValid(Car);
+	});
 
 	FVector CarLocation = Car->GetActorLocation();
 	FVector Forward = Car->GetActorForwardVector();
@@ -79,6 +92,8 @@ void ARacingAIController::Tick(float DeltaTime)
 
 	for (AAI_ArcadeCar* Other : AllCars)
 	{
+		if (!IsValid(Other)) continue;
+		if (Other == Car) continue;
 		FVector ToOther = Other->GetActorLocation() - CarLocation;
 
 		float ForwardDot = FVector::DotProduct(Forward, ToOther.GetSafeNormal());
@@ -147,7 +162,7 @@ void ARacingAIController::Tick(float DeltaTime)
 	// SPEED
 	float Speed = Car->GetVelocity().Size();
 	float SpeedKMH = Speed * 0.036f;
-	
+
 	// --- STUCK DETECTION ---
 	float Movement = FVector::Dist(CarLocation, LastLocation);
 
@@ -161,26 +176,26 @@ void ARacingAIController::Tick(float DeltaTime)
 	}
 
 	LastLocation = CarLocation;
-	
+
 	// --- SAVE SAFE POINT ---
-		SafeUpdateTimer += DeltaTime;
+	SafeUpdateTimer += DeltaTime;
 
-		if (SafeUpdateTimer > 0.5f)
-		{
-			LastSafeLocation =
-				RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
-					ClosestDistance,
-					ESplineCoordinateSpace::World
-				);
+	if (SafeUpdateTimer > 0.5f)
+	{
+		LastSafeLocation =
+			RacingSpline->Spline->GetLocationAtDistanceAlongSpline(
+				ClosestDistance,
+				ESplineCoordinateSpace::World
+			);
 
-			LastSafeRotation =
-				RacingSpline->Spline->GetRotationAtDistanceAlongSpline(
-					ClosestDistance,
-					ESplineCoordinateSpace::World
-				);
+		LastSafeRotation =
+			RacingSpline->Spline->GetRotationAtDistanceAlongSpline(
+				ClosestDistance,
+				ESplineCoordinateSpace::World
+			);
 
-			SafeUpdateTimer = 0.f;
-		}
+		SafeUpdateTimer = 0.f;
+	}
 
 	// LOOKAHEAD
 	float LookAhead =
@@ -243,7 +258,7 @@ void ARacingAIController::Tick(float DeltaTime)
 
 		return;
 	}
-	
+
 	// STEERING
 	float SteerTarget = FVector::DotProduct(Right, ToTarget);
 
