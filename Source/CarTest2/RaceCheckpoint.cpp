@@ -23,17 +23,28 @@ void ARaceCheckpoint::OnOverlap(
 {
 	AArcadeCar* Car = Cast<AArcadeCar>(OtherActor);
 	if (!Car) return;
+	UE_LOG(LogTemp, Warning, TEXT("Total CP: %d"), Car->TotalCheckpoints);
+	UE_LOG(LogTemp, Warning, TEXT("IsPlayer: %d | %s"),
+	Car->IsPlayerControlled(),
+	*Car->DriverName);
+	int PrevCheckpoint = Car->CurrentCheckpoint;
+	int NextCheckpoint = PrevCheckpoint + 1;
 
-	// Correct checkpoint or not
-	if (Car->CurrentCheckpoint == CheckpointIndex)
+	if (NextCheckpoint >= Car->TotalCheckpoints)
 	{
-		Car->CurrentCheckpoint++;
+		NextCheckpoint = 0;
+	}
 
-		// Lap finish or not
-		if (Car->CurrentCheckpoint >= Car->TotalCheckpoints)
+	if (CheckpointIndex == NextCheckpoint)
+	{
+		Car->CurrentCheckpoint = CheckpointIndex;
+
+		// Lap complete
+		if (PrevCheckpoint == Car->TotalCheckpoints - 1 && CheckpointIndex == 0)
 		{
-			Car->CurrentCheckpoint = 0;
 			Car->OnLapCompleted();
+
+			UE_LOG(LogTemp, Warning, TEXT("LAP: %d"), Car->CurrentLap);
 		}
 	}
 }

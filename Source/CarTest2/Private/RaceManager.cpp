@@ -1,10 +1,7 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "RaceManager.h"
+#include "RaceCheckpoint.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/TextBlock.h"
-#include "EngineUtils.h"
 #include "ArcadeCar/ArcadeCar.h"
 
 ARaceManager::ARaceManager()
@@ -16,16 +13,7 @@ void ARaceManager::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UE_LOG(LogTemp, Warning, TEXT("Cars found: %d"), Cars.Num());
-
-	GetWorld()->GetTimerManager().SetTimer(
-		InitTimer,
-		this,
-		&ARaceManager::InitCars,
-		0.5f,
-		false
-	);
-
+	// UI
 	if (RaceHUDClass)
 	{
 		RaceHUD = CreateWidget<UUserWidget>(GetWorld(), RaceHUDClass);
@@ -36,23 +24,19 @@ void ARaceManager::BeginPlay()
 		}
 	}
 
-	int TotalCP = 0;
-
-	for (TActorIterator<ARaceCheckpoint> It(GetWorld()); It; ++It)
-	{
-		TotalCP++;
-	}
-
-	for (AArcadeCar* Car : Cars)
-	{
-		Car->TotalCheckpoints = TotalCP;
-	}
+	// Delay (For finding car after spawn)
+	GetWorld()->GetTimerManager().SetTimer(
+		InitTimer,
+		this,
+		&ARaceManager::InitCars,
+		0.5f,
+		false
+	);
 }
 
 void ARaceManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	UE_LOG(LogTemp, Warning, TEXT("RaceManager Tick"));
 
 	UpdateRanking();
 }
@@ -73,8 +57,23 @@ void ARaceManager::InitCars()
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Cars found: %d"), Cars.Num());
-}
 
+	// Checkpoint find
+	TArray<AActor*> FoundCPs;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ARaceCheckpoint::StaticClass(), FoundCPs);
+
+	int TotalCP = FoundCPs.Num();
+
+	UE_LOG(LogTemp, Warning, TEXT("Total Checkpoints: %d"), TotalCP);
+
+	for (AArcadeCar* Car : Cars)
+	{
+		if (Car)
+		{
+			Car->TotalCheckpoints = TotalCP;
+		}
+	}
+}
 
 void ARaceManager::UpdateRanking()
 {
@@ -89,16 +88,17 @@ void ARaceManager::UpdateRanking()
 			B.CurrentLap * 100000.f +
 			B.CurrentCheckpoint * 1000.f +
 			B.DistanceOnSpline;
+
+		return ScoreA > ScoreB;
 	});
 
-	// DEBUG
+	// DEBUG RANK
 	for (int i = 0; i < Cars.Num(); i++)
 	{
 		if (GEngine && Cars[i])
 		{
-			FString Name = Cars[i]->DriverName;
-
-			FString Msg = FString::FromInt(i + 1) + TEXT(". ") + Name;
+			FString Msg =
+				FString::FromInt(i + 1) + TEXT(". ") + Cars[i]->DriverName;
 
 			GEngine->AddOnScreenDebugMessage(
 				i,
@@ -109,16 +109,21 @@ void ARaceManager::UpdateRanking()
 		}
 	}
 
+	// Player UI
 	for (AArcadeCar* Car : Cars)
 	{
 		if (Car && Car->IsPlayerControlled())
 		{
+			if (!RaceHUD) return;
+
 			UTextBlock* LapTextBlock =
 				Cast<UTextBlock>(RaceHUD->GetWidgetFromName(TEXT("LapText")));
 
 			if (LapTextBlock)
 			{
-				FString LapStr = FString::Printf(TEXT("Lap: %d"), Car->CurrentLap);
+				FString LapStr =
+					FString::Printf(TEXT("Lap: %d"), Car->CurrentLap);
+
 				LapTextBlock->SetText(FText::FromString(LapStr));
 			}
 
@@ -126,7 +131,7 @@ void ARaceManager::UpdateRanking()
 		}
 	}
 
-
+	// Ranking UI
 	if (RaceHUD)
 	{
 		UTextBlock* RankingTextBlock =
@@ -134,13 +139,91 @@ void ARaceManager::UpdateRanking()
 
 		if (RankingTextBlock)
 		{
-			RankingTextBlock->SetText(FText::FromString(BuildRankingText()));
+			RankingTextBlock->SetText(
+				FText::FromString(BuildRankingText())
+			);
 		}
-
-		if (!RankingTextBlock)
+		else
 		{
 			UE_LOG(LogTemp, Error, TEXT("RankingText NOT FOUND"));
 		}
+	}
+
+	// PLAYER FINISH
+	if (!bRaceFinished)
+	{
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+
+		if (PC && PC->GetPawn())
+		{
+			AArcadeCar* PlayerCar = Cast<AArcadeCar>(PC->GetPawn());
+
+			if (PlayerCar)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("CHECK FINISH (PLAYER): %d / %d"),
+					PlayerCar->CurrentLap,
+					MaxLap);
+
+				if (PlayerCar->CurrentLap >= MaxLap)
+				{
+					bRaceFinished = true;
+
+					UE_LOG(LogTemp, Warning, TEXT("RACE FINISHED!"));
+
+					ShowWinnerUI();
+				}
+			}
+		}
+	}
+}
+
+void ARaceManager::ShowWinnerUI()
+{
+	if (!WinnerHUDClass) return;
+
+	WinnerHUD = CreateWidget<UUserWidget>(GetWorld(), WinnerHUDClass);
+
+	if (WinnerHUD)
+	{
+		WinnerHUD->AddToViewport();
+	}
+
+	// WINNER 
+	AArcadeCar* WinnerCar = nullptr;
+
+	if (Cars.Num() > 0)
+	{
+		WinnerCar = Cars[0];
+	}
+
+	// Winner text
+	if (WinnerHUD && WinnerCar)
+	{
+		UTextBlock* WinnerText =
+			Cast<UTextBlock>(WinnerHUD->GetWidgetFromName(TEXT("WinnerText")));
+
+		if (WinnerText)
+		{
+			FString Text = TEXT("WINNER: ") + WinnerCar->DriverName;
+			WinnerText->SetText(FText::FromString(Text));
+		}
+	}
+
+	// Ranking text
+	UTextBlock* RankingText =
+		Cast<UTextBlock>(WinnerHUD->GetWidgetFromName(TEXT("RankingText")));
+
+	if (RankingText)
+	{
+		RankingText->SetText(FText::FromString(BuildRankingText()));
+	}
+
+	// input
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (PC)
+	{
+		PC->SetShowMouseCursor(true);
+		PC->SetInputMode(FInputModeUIOnly());
 	}
 }
 
@@ -152,9 +235,11 @@ FString ARaceManager::BuildRankingText()
 	{
 		if (!Cars[i]) continue;
 
-		FString Name = Cars[i]->DriverName;
-
-		Result += FString::FromInt(i + 1) + TEXT(". ") + Name + TEXT("\n");
+		Result +=
+			FString::FromInt(i + 1) +
+			TEXT(". ") +
+			Cars[i]->DriverName +
+			TEXT("\n");
 	}
 
 	return Result;

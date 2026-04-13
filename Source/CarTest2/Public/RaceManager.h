@@ -28,11 +28,22 @@ public:
 	void InitCars();
 
 	void UpdateRanking();
-	
+	void ShowWinnerUI();
+
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UUserWidget> RaceHUDClass;
 
 	UUserWidget* RaceHUD;
 
 	FString BuildRankingText();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int MaxLap = 1;
+
+	bool bRaceFinished = false;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UUserWidget> WinnerHUDClass;
+
+	UUserWidget* WinnerHUD;
 };

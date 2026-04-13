@@ -125,6 +125,13 @@ void AArcadeCar::BeginPlay()
     UGameplayStatics::GetActorOfClass(GetWorld(), ARacingSpline::StaticClass())
 );
     
+    // Start of the race
+    if (!bInitialized)
+    {
+        CurrentCheckpoint = 0;
+        bInitialized = true;
+    }
+    
     TArray<UStaticMeshComponent*> WheelMeshes = { Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR };
     for (int32 i = 0; i < 4; i++)
     {
@@ -183,6 +190,10 @@ void AArcadeCar::Tick(float DeltaTime)
     UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 
+    UE_LOG(LogTemp, Warning, TEXT("CAR: %s | LAP: %d"),
+        *DriverName,
+        CurrentLap);
+    
     if (RacingSpline)
     {
         float Key = RacingSpline->Spline->FindInputKeyClosestToWorldLocation(GetActorLocation());
@@ -257,12 +268,14 @@ void AArcadeCar::Tick(float DeltaTime)
 
 void AArcadeCar::OnLapCompleted()
 {
+    
     float Time = GetWorld()->GetTimeSeconds();
 
     if (Time - LastLapTriggerTime < 2.0f) return;
 
     CurrentLap++;
     LastLapTriggerTime = Time;
+    UE_LOG(LogTemp, Warning, TEXT("LAP INCREASED TO: %d"), CurrentLap);
 }
 
 void AArcadeCar::ApplyCustomPhysics(float DeltaTime)

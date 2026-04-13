@@ -57,10 +57,15 @@ public:
     int CurrentLap = 0;
     
     UPROPERTY(BlueprintReadWrite)
-    int CurrentCheckpoint = 0;
+    int CurrentCheckpoint = -1;
 
     UPROPERTY(BlueprintReadWrite)
     int TotalCheckpoints = 0;
+    
+    UPROPERTY(BlueprintReadWrite)
+    bool bFinished = false;
+    
+    bool bInitialized = false;
 
 #if WITH_EDITOR
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
