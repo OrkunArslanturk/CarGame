@@ -7,7 +7,10 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Kismet/GameplayStatics.h"
+#include "RacingSpline.h"
 #include <limits>
+
 
 AArcadeCar::AArcadeCar()
 {
@@ -118,6 +121,10 @@ void AArcadeCar::BeginPlay()
 {
     Super::BeginPlay();
     
+    RacingSpline = Cast<ARacingSpline>(
+    UGameplayStatics::GetActorOfClass(GetWorld(), ARacingSpline::StaticClass())
+);
+    
     TArray<UStaticMeshComponent*> WheelMeshes = { Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR };
     for (int32 i = 0; i < 4; i++)
     {
@@ -176,6 +183,16 @@ void AArcadeCar::Tick(float DeltaTime)
     UChaosWheeledVehicleMovementComponent* Vehicle =
         Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
 
+    if (RacingSpline)
+    {
+        float Key = RacingSpline->Spline->FindInputKeyClosestToWorldLocation(GetActorLocation());
+
+        float Distance =
+            RacingSpline->Spline->GetDistanceAlongSplineAtSplineInputKey(Key);
+
+        DistanceOnSpline = Distance;
+    }
+    
     if (Vehicle)
     {
         SpeedKMH = Vehicle->GetForwardSpeed() * 0.036f;
@@ -236,6 +253,16 @@ void AArcadeCar::Tick(float DeltaTime)
     UpdateWheelVisuals();
     UpdateCameraEffects(DeltaTime);
     ShowDebugInfo();
+}
+
+void AArcadeCar::OnLapCompleted()
+{
+    float Time = GetWorld()->GetTimeSeconds();
+
+    if (Time - LastLapTriggerTime < 2.0f) return;
+
+    CurrentLap++;
+    LastLapTriggerTime = Time;
 }
 
 void AArcadeCar::ApplyCustomPhysics(float DeltaTime)

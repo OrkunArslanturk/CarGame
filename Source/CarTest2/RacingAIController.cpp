@@ -201,7 +201,7 @@ void ARacingAIController::Tick(float DeltaTime)
 	float LookAhead =
 		FMath::GetMappedRangeValueClamped(
 			FVector2D(0.f, 4000.f),
-			FVector2D(800.f, 2000.f),
+			FVector2D(1200.f, 3000.f),
 			Speed
 		);
 
@@ -288,16 +288,16 @@ void ARacingAIController::Tick(float DeltaTime)
 
 	if (TurnStrength > 0.6f)
 	{
-		Throttle = FMath::Lerp(0.3f, 0.5f, Car->Skill);
+		Throttle = FMath::Lerp(0.6f, 0.9f, Car->Skill);
 	}
 	else if (TurnStrength > 0.3f)
 	{
-		Throttle = FMath::Lerp(0.6f, 0.8f, Car->Skill);
+		Throttle = FMath::Lerp(0.8f, 1.0f, Car->Skill);
 	}
 
-	if (SpeedKMH > 180.f)
+	if (SpeedKMH > 200.f)
 	{
-		Throttle = 0.5f;
+		Throttle = 0.7f;
 	}
 
 	Car->SetThrottle(Throttle);

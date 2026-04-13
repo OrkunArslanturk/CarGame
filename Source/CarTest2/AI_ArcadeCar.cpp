@@ -51,14 +51,30 @@ void AAI_ArcadeCar::BeginPlay()
 	switch (AILevel)
 	{
 	case EAILevel::Normal:
-		Skill = 0.9f;
+		Skill = 1.2f;
 		Aggression = 0.8f;
 		break;
 
 	case EAILevel::VeryGood:
-		Skill = 1.2f;
+		Skill = 1.8f;
 		Aggression = 1.5f;
 		break;
+	}
+	
+	auto* Vehicle = Cast<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+
+	if (Vehicle)
+	{
+		if (AILevel == EAILevel::Normal)
+		{
+			Vehicle->EngineSetup.MaxTorque *= 1.2f;
+			Vehicle->EngineSetup.MaxRPM *= 1.1f;
+		}
+		else if (AILevel == EAILevel::VeryGood)
+		{
+			Vehicle->EngineSetup.MaxTorque *= 1.5f;
+			Vehicle->EngineSetup.MaxRPM *= 1.3f;
+		}
 	}
 }
 

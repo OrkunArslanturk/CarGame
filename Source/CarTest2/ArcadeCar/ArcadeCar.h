@@ -16,6 +16,8 @@ class UInputAction;
 class UInputMappingContext;
 class USpringArmComponent;
 class UCameraComponent;
+class ARacingSpline;
+
 
 UCLASS()
 class CARTEST2_API AArcadeCar : public AWheeledVehiclePawn
@@ -37,7 +39,28 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
     UAudioComponent* EngineAudioComponent;
     ////////////////////////////////////////////////////////////////////////////
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Race")
+    FString DriverName = "Driver";
+    
+    UPROPERTY()
+    ARacingSpline* RacingSpline;
+    
+    float LastLapTriggerTime = 0.f;
 
+    void OnLapCompleted();
+    
+    UPROPERTY(BlueprintReadOnly)
+    float DistanceOnSpline = 0.f;
+
+    UPROPERTY(BlueprintReadOnly)
+    int CurrentLap = 0;
+    
+    UPROPERTY(BlueprintReadWrite)
+    int CurrentCheckpoint = 0;
+
+    UPROPERTY(BlueprintReadWrite)
+    int TotalCheckpoints = 0;
 
 #if WITH_EDITOR
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
