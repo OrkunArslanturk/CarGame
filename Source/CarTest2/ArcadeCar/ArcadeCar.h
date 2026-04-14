@@ -62,6 +62,9 @@ public:
     UPROPERTY(BlueprintReadWrite)
     int TotalCheckpoints = 0;
     
+    UPROPERTY(BlueprintReadOnly)
+    float Progress;
+    
     UPROPERTY(BlueprintReadWrite)
     bool bFinished = false;
     

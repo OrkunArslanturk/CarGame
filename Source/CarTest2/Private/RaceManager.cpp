@@ -77,19 +77,17 @@ void ARaceManager::InitCars()
 
 void ARaceManager::UpdateRanking()
 {
+	
+	Cars.RemoveAll([](AArcadeCar* Car)
+	{
+		return Car == nullptr || !IsValid(Car);
+	});
+	
+	if (bRaceFinished) return;
+
 	Cars.Sort([](const AArcadeCar& A, const AArcadeCar& B)
 	{
-		float ScoreA =
-			A.CurrentLap * 100000.f +
-			A.CurrentCheckpoint * 1000.f +
-			A.DistanceOnSpline;
-
-		float ScoreB =
-			B.CurrentLap * 100000.f +
-			B.CurrentCheckpoint * 1000.f +
-			B.DistanceOnSpline;
-
-		return ScoreA > ScoreB;
+		return A.Progress > B.Progress;
 	});
 
 	// DEBUG RANK
@@ -161,10 +159,10 @@ void ARaceManager::UpdateRanking()
 			if (PlayerCar)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("CHECK FINISH (PLAYER): %d / %d"),
-					PlayerCar->CurrentLap,
-					MaxLap);
+				       PlayerCar->CurrentLap,
+				       MaxLap);
 
-				if (PlayerCar->CurrentLap >= MaxLap)
+				if (PlayerCar->CurrentLap >= MaxLap && PlayerCar->CurrentCheckpoint == 0)
 				{
 					bRaceFinished = true;
 
@@ -220,11 +218,30 @@ void ARaceManager::ShowWinnerUI()
 
 	// input
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (PC)
+	if (PC && WinnerHUD)
 	{
-		PC->SetShowMouseCursor(true);
-		PC->SetInputMode(FInputModeUIOnly());
+		PC->bShowMouseCursor = true;
+
+		FInputModeUIOnly Mode;
+		Mode.SetWidgetToFocus(WinnerHUD->TakeWidget());
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+
+		PC->SetInputMode(Mode);
 	}
+	
+	// slow motion
+	UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.2f);
+
+	// motor sesi fade out
+	for (AArcadeCar* Car : Cars)
+	{
+		if (Car && Car->EngineAudioComponent)
+		{
+			Car->EngineAudioComponent->FadeOut(0.5f, 0.0f);
+		}
+	}
+	
+	SetActorTickEnabled(false);
 }
 
 FString ARaceManager::BuildRankingText()

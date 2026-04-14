@@ -38,9 +38,11 @@ public:
 	FString BuildRankingText();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int MaxLap = 1;
+	int MaxLap = 3;
 
 	bool bRaceFinished = false;
+	
+	TArray<AArcadeCar*> FinalRanking;
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<UUserWidget> WinnerHUDClass;
