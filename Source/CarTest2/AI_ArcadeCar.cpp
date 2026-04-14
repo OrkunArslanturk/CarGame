@@ -52,12 +52,12 @@ void AAI_ArcadeCar::BeginPlay()
 	{
 	case EAILevel::Normal:
 		Skill = 1.2f;
-		Aggression = 0.8f;
+		// Aggression = 0.8f;
 		break;
 
 	case EAILevel::VeryGood:
 		Skill = 1.8f;
-		Aggression = 1.5f;
+		// Aggression = 1.5f;
 		break;
 	}
 	

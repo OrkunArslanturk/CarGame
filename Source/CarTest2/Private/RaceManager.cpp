@@ -52,7 +52,7 @@ void ARaceManager::InitCars()
 		{
 			Cars.Add(Car);
 
-			UE_LOG(LogTemp, Warning, TEXT("Car added: %s"), *Car->DriverName);
+			// UE_LOG(LogTemp, Warning, TEXT("Car added: %s"), *Car->DriverName);
 		}
 	}
 
@@ -64,7 +64,7 @@ void ARaceManager::InitCars()
 
 	int TotalCP = FoundCPs.Num();
 
-	UE_LOG(LogTemp, Warning, TEXT("Total Checkpoints: %d"), TotalCP);
+	// UE_LOG(LogTemp, Warning, TEXT("Total Checkpoints: %d"), TotalCP);
 
 	for (AArcadeCar* Car : Cars)
 	{
@@ -77,6 +77,10 @@ void ARaceManager::InitCars()
 
 void ARaceManager::UpdateRanking()
 {
+	if (!bRaceStarted)
+	{
+		return;
+	}
 	
 	Cars.RemoveAll([](AArcadeCar* Car)
 	{
@@ -91,21 +95,21 @@ void ARaceManager::UpdateRanking()
 	});
 
 	// DEBUG RANK
-	for (int i = 0; i < Cars.Num(); i++)
-	{
-		if (GEngine && Cars[i])
-		{
-			FString Msg =
-				FString::FromInt(i + 1) + TEXT(". ") + Cars[i]->DriverName;
-
-			GEngine->AddOnScreenDebugMessage(
-				i,
-				0.f,
-				FColor::Green,
-				Msg
-			);
-		}
-	}
+	// for (int i = 0; i < Cars.Num(); i++)
+	// {
+	// 	if (GEngine && Cars[i])
+	// 	{
+	// 		FString Msg =
+	// 			FString::FromInt(i + 1) + TEXT(". ") + Cars[i]->DriverName;
+	//
+	// 		GEngine->AddOnScreenDebugMessage(
+	// 			i,
+	// 			0.f,
+	// 			FColor::Green,
+	// 			Msg
+	// 		);
+	// 	}
+	// }
 
 	// Player UI
 	for (AArcadeCar* Car : Cars)
@@ -143,11 +147,11 @@ void ARaceManager::UpdateRanking()
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("RankingText NOT FOUND"));
+			// UE_LOG(LogTemp, Error, TEXT("RankingText null"));
 		}
 	}
 
-	// PLAYER FINISH
+	// Player finish
 	if (!bRaceFinished)
 	{
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
@@ -166,7 +170,7 @@ void ARaceManager::UpdateRanking()
 				{
 					bRaceFinished = true;
 
-					UE_LOG(LogTemp, Warning, TEXT("RACE FINISHED!"));
+					// UE_LOG(LogTemp, Warning, TEXT("Race finish"));
 
 					ShowWinnerUI();
 				}
@@ -186,7 +190,7 @@ void ARaceManager::ShowWinnerUI()
 		WinnerHUD->AddToViewport();
 	}
 
-	// WINNER 
+	// Winner
 	AArcadeCar* WinnerCar = nullptr;
 
 	if (Cars.Num() > 0)
@@ -232,7 +236,7 @@ void ARaceManager::ShowWinnerUI()
 	// slow motion
 	UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.2f);
 
-	// motor sesi fade out
+	// motor voice fade out
 	for (AArcadeCar* Car : Cars)
 	{
 		if (Car && Car->EngineAudioComponent)

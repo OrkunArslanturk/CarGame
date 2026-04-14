@@ -5,6 +5,7 @@
 #include "RaceCheckpoint.generated.h"
 
 class UBoxComponent;
+class ARaceManager;
 
 UCLASS()
 class CARTEST2_API ARaceCheckpoint : public AActor

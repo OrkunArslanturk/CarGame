@@ -2,6 +2,8 @@
 
 #include "RaceCheckpoint.h"
 #include "Components/BoxComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "RaceManager.h"
 #include "ArcadeCar/ArcadeCar.h"
 
 ARaceCheckpoint::ARaceCheckpoint()
@@ -23,10 +25,7 @@ void ARaceCheckpoint::OnOverlap(
 {
 	AArcadeCar* Car = Cast<AArcadeCar>(OtherActor);
 	if (!Car) return;
-	UE_LOG(LogTemp, Warning, TEXT("Total CP: %d"), Car->TotalCheckpoints);
-	UE_LOG(LogTemp, Warning, TEXT("IsPlayer: %d | %s"),
-	Car->IsPlayerControlled(),
-	*Car->DriverName);
+
 	int PrevCheckpoint = Car->CurrentCheckpoint;
 	int NextCheckpoint = PrevCheckpoint + 1;
 
@@ -39,12 +38,24 @@ void ARaceCheckpoint::OnOverlap(
 	{
 		Car->CurrentCheckpoint = CheckpointIndex;
 
+		// Race start
+		if (CheckpointIndex == 0 && Car->IsPlayerControlled())
+		{
+			if (ARaceManager* RM = Cast<ARaceManager>(
+				UGameplayStatics::GetActorOfClass(GetWorld(), ARaceManager::StaticClass())))
+			{
+				RM->bRaceStarted = true;
+
+				// UE_LOG(LogTemp, Warning, TEXT("Race start"));
+			}
+		}
+
 		// Lap complete
 		if (PrevCheckpoint == Car->TotalCheckpoints - 1 && CheckpointIndex == 0)
 		{
 			Car->OnLapCompleted();
 
-			UE_LOG(LogTemp, Warning, TEXT("LAP: %d"), Car->CurrentLap);
+			// UE_LOG(LogTemp, Warning, TEXT("Lap: %d"), Car->CurrentLap);
 		}
 	}
 }

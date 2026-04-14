@@ -40,8 +40,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI")
 	float Skill = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI")
-	float Aggression = 1.0f;
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI")
+	// float Aggression = 1.0f;
 private:
 
 	float CurrentSteer = 0.f;

@@ -39,7 +39,8 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int MaxLap = 3;
-
+	
+	bool bRaceStarted = false;
 	bool bRaceFinished = false;
 	
 	TArray<AArcadeCar*> FinalRanking;
